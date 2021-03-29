@@ -1,38 +1,68 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "validator.h"
 
-int get_token_type(char token) {
+unsigned char grammar_table[7][7] = {
+    {1, 0, 0, 0, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 0, 1, 1, 1, 1},
+    {1, 0, 0, 0, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1}
+};
+
+ParserState* construct_parser_state() {
+    ParserState* state = malloc(sizeof(ParserState));
+    state->token_history = construct_linked_list();
+    // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
+    // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.
+    linked_list_insert(state->token_history, block_open);
+    state->escape_active = 0;
+    state->open_blocks = 0;
+    state->invalid = 0;
+    return state;
+}
+
+Token get_token_type(char token, int escape_active) {
+    if (escape_active) return character;
     if (token == '(') return block_open;
     if (token == ')') return block_close;
     if (token == '*') return mod_multiple;
     if (token == '+') return mod_choice;
     if (token == '\\') return escape;
+    if (token == ' ' || token == '\t' || token == '\n') return whitespace;
     return character;
 }
 
-size_t token_type_to_grammar_index(unsigned int token_type) {
-    unsigned int bitmask = 0x1;
-    for (size_t idx = 0;; idx++) {
-        if (token_type & bitmask) return idx;
-        bitmask = bitmask << 1;
-    }
-}
+ParserState* parse_regex(char *regex) {
+    ParserState *state = construct_parser_state();
+    for (size_t idx = 0; idx < strlen(regex); idx++) {
+        linked_list_insert(state->token_history, get_token_type(regex[idx], state->escape_active));
+        Token previous = state->token_history->last->previous->token;
+        Token current = state->token_history->last->token;
+        if (!grammar_table[previous][current] || current == block_close && state->open_blocks == 0) {
+            state->invalid = 1;
+            return state;
+        }
 
-int is_valid_regex(char *regex) {
-    // previous_token_type ist am Anfang auf 0 gesetzt, weil die zugehörigen Regeln für block_open
-    // genau die gleichen sind wie für das erste Token im Regex (siehe Definition grammar_table).
-    int previous_token_type = 0;
-    int current_token_type = 0;
-    int open_blocks_counter = 0;
-    for (size_t idx = 0; idx < strlen(regex); idx++, previous_token_type = current_token_type) {
-        int current_token_type = get_token_type(regex[idx]);
-        if (!grammar_table[previous_token_type][current_token_type]) return 0;
-        if (current_token_type == block_close && open_blocks_counter == 0) return 0;
-        if (current_token_type == block_open) open_blocks_counter++;
-        if (current_token_type == block_close) open_blocks_counter--;
+        if (current == block_open) state->open_blocks++;
+        if (current == block_close) state->open_blocks--;
+        
+        if (current == escape) state->escape_active = 1;
+        else state->escape_active = 0;
     }
 
     // prüfen, ob am Ende noch Gruppen angefangen und dann nicht geschlossen wurden
-    if (open_blocks_counter != 0) return 0;
-    if (previous_token_type & (mod_choice | escape)) return 0;
-    return 1;
+    Token last = state->token_history->last->token;
+    if (state->open_blocks != 0 || last == mod_choice || last == escape) {
+        state->invalid = 1;
+        return state;
+    }
+    
+    // Dummy-Element vom Anfang entfernen
+    linked_list_remove_nth(state->token_history, 0);
+    linked_list_iterate(state->token_history);
+    return state;
 }
