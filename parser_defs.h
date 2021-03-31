@@ -2,6 +2,7 @@
 #define PARSER_DEFS_H
 
 #include <stddef.h>
+#include "VLA.h"
 
 typedef enum {
     block_open = 0,
@@ -13,20 +14,8 @@ typedef enum {
     character = 6,
 } Token;
 
-typedef struct Node {
-    Token token;
-    struct Node *previous;
-    struct Node *next;
-} Node;
-
 typedef struct {
-    Node *first;
-    Node *last;
-    size_t length;
-} LinkedList;
-
-typedef struct {
-    LinkedList *token_history;
+    VLA *token_history;
     Token previous;
     Token current;
     int escape_active;
@@ -39,11 +28,6 @@ typedef struct {
 // ohne Inhalt sofort wieder geschlossen werden darf.
 extern unsigned char grammar_table[7][7];
 
-LinkedList* construct_linked_list();
-void linked_list_insert(LinkedList *list, Token token);
-void linked_list_remove_nth(LinkedList *list, int idx);
-void linked_list_print(LinkedList *list);
-
 ParserState* construct_parser_state();
 // Definiert ein Mapping von Buchstaben auf die einzelnen Token-Typen.
 // Sollte man also den von mir gewählten Regex-Dialekt (weil in FoSA so gemacht lol)
@@ -54,5 +38,12 @@ Token get_token_type(char token, int escape_active);
 char* get_token_description(Token token);
 // Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist (semantisch ist nochmal ne Ecke schwerer)
 ParserState* parse_regex(char *regex);
+
+// Gibt das Token an der idx'ten Stelle zurück.
+// Unterstützt außerdem negative Indizes (also -1 für letztes, -2 für vorletztes Token etc).
+Token VLA_get_token_at_index(VLA *v, signed long idx);
+
+// Gibt alle Tokens im VLA auf stdin aus.
+void VLA_print_tokens(VLA* v);
 
 #endif
