@@ -15,10 +15,7 @@ unsigned char grammar_table[7][7] = {
 
 ParserState* construct_parser_state() {
     ParserState* state = malloc(sizeof(ParserState));
-    state->token_history = construct_linked_list();
-    // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
-    // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.
-    linked_list_insert(state->token_history, block_open);
+    state->token_history = VLA_initialize(10, sizeof(Token));
     state->escape_active = 0;
     state->open_blocks = 0;
     state->invalid = 0;
@@ -48,10 +45,14 @@ char* get_token_description(Token token) {
 
 ParserState* parse_regex(char *regex) {
     ParserState *state = construct_parser_state();
+    // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
+    // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.
+    Token previous = block_open;
     for (size_t idx = 0; idx < strlen(regex); idx++) {
-        linked_list_insert(state->token_history, get_token_type(regex[idx], state->escape_active));
-        Token previous = state->token_history->last->previous->token;
-        Token current = state->token_history->last->token;
+        if (idx != 0) previous = VLA_get_token_at_index(state->token_history, -1);
+        Token current = get_token_type(regex[idx], state->escape_active);
+        VLA_insert(state->token_history, &current, 1);
+        
         if (!grammar_table[previous][current] || current == block_close && state->open_blocks == 0) {
             state->invalid = 1;
             return state;
@@ -65,14 +66,12 @@ ParserState* parse_regex(char *regex) {
     }
 
     // prüfen, ob am Ende noch Gruppen angefangen und dann nicht geschlossen wurden
-    Token last = state->token_history->last->token;
+    Token last = VLA_get_token_at_index(state->token_history, -1);
     if (state->open_blocks != 0 || last == mod_choice || last == mod_escape) {
         state->invalid = 1;
         return state;
     }
     
-    // Dummy-Element vom Anfang entfernen
-    linked_list_remove_nth(state->token_history, 0);
-    linked_list_print(state->token_history);
+    VLA_print_tokens(state->token_history);
     return state;
 }
