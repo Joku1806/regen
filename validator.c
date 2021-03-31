@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "validator.h"
+#include "parser_defs.h"
 
 unsigned char grammar_table[7][7] = {
     {1, 0, 0, 0, 1, 1, 1},
@@ -31,9 +31,19 @@ Token get_token_type(char token, int escape_active) {
     if (token == ')') return block_close;
     if (token == '*') return mod_multiple;
     if (token == '+') return mod_choice;
-    if (token == '\\') return escape;
+    if (token == '\\') return mod_escape;
     if (token == ' ' || token == '\t' || token == '\n') return whitespace;
     return character;
+}
+
+char* get_token_description(Token token) {
+    if (token == block_open) return "Block::open";
+    if (token == block_close) return "Block::close";
+    if (token == mod_multiple) return "Mod::multiple";
+    if (token == mod_choice) return "Mod::choice";
+    if (token == mod_escape) return "Mod::escape";
+    if (token == whitespace) return "Whitespace";
+    return "Character";
 }
 
 ParserState* parse_regex(char *regex) {
@@ -50,19 +60,19 @@ ParserState* parse_regex(char *regex) {
         if (current == block_open) state->open_blocks++;
         if (current == block_close) state->open_blocks--;
         
-        if (current == escape) state->escape_active = 1;
+        if (current == mod_escape) state->escape_active = 1;
         else state->escape_active = 0;
     }
 
     // prüfen, ob am Ende noch Gruppen angefangen und dann nicht geschlossen wurden
     Token last = state->token_history->last->token;
-    if (state->open_blocks != 0 || last == mod_choice || last == escape) {
+    if (state->open_blocks != 0 || last == mod_choice || last == mod_escape) {
         state->invalid = 1;
         return state;
     }
     
     // Dummy-Element vom Anfang entfernen
     linked_list_remove_nth(state->token_history, 0);
-    linked_list_iterate(state->token_history);
+    linked_list_print(state->token_history);
     return state;
 }

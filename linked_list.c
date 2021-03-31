@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "linked_list.h"
+#include "parser_defs.h"
 
 LinkedList* construct_linked_list() {
     LinkedList *new = malloc(sizeof(LinkedList));
@@ -10,7 +10,7 @@ LinkedList* construct_linked_list() {
     return new;
 }
 
-void linked_list_insert(LinkedList *list, int token) {
+void linked_list_insert(LinkedList *list, Token token) {
     Node *new = malloc(sizeof(Node));
     new->token = token;
     new->next = NULL;
@@ -35,11 +35,11 @@ void linked_list_remove_nth(LinkedList *list, int idx) {
     list->length--;
 }
 
-void linked_list_iterate(LinkedList *list) {
+void linked_list_print(LinkedList *list) {
     Node *current = list->first;
 
     while (current != NULL) {
-        printf("%x\n", current->token);
+        printf("%s\n", get_token_description(current->token));
         current = current->next;
     }
 }
