@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "parser_defs.h"
+#include "parser.h"
 
 unsigned char grammar_table[7][7] = {
     {1, 0, 0, 0, 1, 1, 1},
@@ -13,9 +13,10 @@ unsigned char grammar_table[7][7] = {
     {1, 1, 1, 1, 1, 1, 1}
 };
 
-ParserState* construct_parser_state() {
+ParserState* construct_parser_state(char *regex) {
     ParserState* state = malloc(sizeof(ParserState));
-    state->token_history = VLA_initialize(10, sizeof(Token));
+    state->tokens = NULL;
+    state->cleaned_regex = calloc(strlen(regex) + 1, sizeof(char));
     state->escape_active = 0;
     state->open_blocks = 0;
     state->invalid = 0;
@@ -43,15 +44,27 @@ char* get_token_description(Token token) {
     return "Character";
 }
 
+Token VLA_binding_get_Token(VLA *v, signed long idx) {
+    VLA_assert_item_size_matches(v, sizeof(Token));
+    return *(Token *)VLA_get(v, idx);
+}
+
+void Token_printer(void *address) {
+    printf("%s", get_token_description(*(Token *)address));
+}
+
 ParserState* parse_regex(char *regex) {
-    ParserState *state = construct_parser_state();
+    ParserState *state = construct_parser_state(regex);
+    VLA *token_history = VLA_initialize(strlen(regex), sizeof(Token));
+    VLA_set_data_freeing_policy(token_history, persistent);
+    VLA_set_item_printer(token_history, Token_printer);
+
     // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
     // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.
     Token previous = block_open;
     for (size_t idx = 0; idx < strlen(regex); idx++) {
-        if (idx != 0) previous = VLA_get_token_at_index(state->token_history, -1);
+        if (token_history->length != 0) previous = VLA_binding_get_Token(token_history, -1);
         Token current = get_token_type(regex[idx], state->escape_active);
-        VLA_insert(state->token_history, &current, 1);
         
         if (!grammar_table[previous][current] || current == block_close && state->open_blocks == 0) {
             state->invalid = 1;
@@ -63,15 +76,27 @@ ParserState* parse_regex(char *regex) {
         
         if (current == mod_escape) state->escape_active = 1;
         else state->escape_active = 0;
+
+        // Nur zu den Token hinzufügen wenn es syntaktisch wichtig ist
+        if (current != mod_escape && current != whitespace) {
+            size_t char_index = token_history->length / token_history->item_size;
+            state->cleaned_regex[char_index] = regex[idx];
+            VLA_append(token_history, &current, 1);
+        }
     }
 
     // prüfen, ob am Ende noch Gruppen angefangen und dann nicht geschlossen wurden
-    Token last = VLA_get_token_at_index(state->token_history, -1);
-    if (state->open_blocks != 0 || last == mod_choice || last == mod_escape) {
+    Token last = VLA_binding_get_Token(token_history, -1);
+    if (state->open_blocks != 0 || state->escape_active || last == mod_choice) {
         state->invalid = 1;
         return state;
     }
     
-    VLA_print_tokens(state->token_history);
+    printf("Parsed Tokens: ");
+    VLA_print(token_history);
+    printf("Cleaned regex: %s\n", state->cleaned_regex);
+    
+    state->tokens = (Token *)token_history->data;
+    VLA_free(token_history);
     return state;
 }
