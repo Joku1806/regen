@@ -110,12 +110,14 @@ void VLA_print(VLA* v) {
         return;
     }
 
-    printf("| ");
+    // TODO: Erstmal alles in String schreiben, erst dann ausgeben, ermöglicht besseres Layout und Ausgabe mit debug()
+    printf("VLA with Item size: %lu Bytes -- Space: %lu/%lu Bytes (%s)\n", v->item_size, v->length, v->capacity, v->data_freeing_policy == freeable ? "freeable" : "immutable");
+    if (v->length > 0) printf("| ");
     for (size_t offset = 0; offset < v->length; offset += v->item_size) {
         v->item_printer(v->data + offset);
         printf(" | ");
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 // Löscht den VLA selbst und optional auch den data-Array
