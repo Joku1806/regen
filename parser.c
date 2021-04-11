@@ -66,7 +66,7 @@ ParserState* parse_regex(char *regex) {
         if (token_history->length != 0) previous = VLA_binding_get_Token(token_history, -1);
         Token current = get_token_type(regex[idx], state->escape_active);
         
-        if (!grammar_table[previous][current] || current == block_close && state->open_blocks == 0) {
+        if (!grammar_table[previous][current] || (current == block_close && state->open_blocks == 0)) {
             state->invalid = 1;
             return state;
         }
