@@ -60,19 +60,19 @@ DFA_State *VLA_binding_get_DFA_State(VLA *v, signed long idx) {
     return (DFA_State *)VLA_get(v, idx);
 }
 
-void DFA_State_printer(void *address) {
-    printf("z%lu", ((DFA_State*)address)->id);
-}
-
 void size_t_printer(void *address) {
     printf("%lu", *(size_t *)address);
+}
+
+void DFA_State_printer(void *address) {
+    printf("z%lu", ((DFA_State*)address)->id);
 }
 
 void increment_current_level_group_counter(VLA *levels) {
     VLA_replace_at_index(levels, &(size_t){VLA_binding_get_size_t(levels, -1) + 1}, -1);
 }
 
-DFA* generate_first_pass_from_parsed_regex(ParserState *parsed) {
+DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
     size_t id_counter = 2;
     DFA *generated = construct_DFA();
     
@@ -88,12 +88,12 @@ DFA* generate_first_pass_from_parsed_regex(ParserState *parsed) {
     VLA_append(level_group_counters, &(size_t){0}, 1);
 
     for (size_t idx = 0; idx < strlen(parsed->cleaned_regex); idx++) {
-        printf("Current group counter stack is: ");
-        VLA_print(level_group_counters);
-        printf("Current start stack is: ");
-        VLA_print(start_node_stack);
-        printf("Current end stack is: ");
-        VLA_print(end_node_stack);
+        // printf("Current group counter stack is:\n");
+        // VLA_print(level_group_counters);
+        // printf("Current start stack is:\n");
+        // VLA_print(start_node_stack);
+        // printf("Current end stack is:\n");
+        // VLA_print(end_node_stack);
         Token current = parsed->tokens[idx];
         DFA_State *current_start = VLA_binding_get_DFA_State(start_node_stack, -1);
         DFA_State *current_stop = VLA_binding_get_DFA_State(end_node_stack, -1);
@@ -112,18 +112,10 @@ DFA* generate_first_pass_from_parsed_regex(ParserState *parsed) {
         }
 
         if (current == block_close) {
-            // TODO: genau das gleiche wie mod_choice?
-            size_t groups = VLA_binding_get_size_t(level_group_counters, -1);
-            debug("Now stepping back %u starting nodes.\n", groups);
-            VLA_delete_at_index_order_safe(level_group_counters, -1);
-            for (size_t cnt = 0; cnt < groups; cnt++) {
-                // TODO: Löschen mit einem Funktionsaufruf unterstützen
-                VLA_delete_at_index_order_safe(start_node_stack, -1);
-            }
-
             DFA_add_dummy_connection_between(current_start, current_stop);
             VLA_delete_at_index_order_safe(end_node_stack, -1);
             VLA_append(start_node_stack, current_stop, 1);
+            increment_current_level_group_counter(level_group_counters);
         }
         
         if (current == character) {
@@ -151,12 +143,16 @@ DFA* generate_first_pass_from_parsed_regex(ParserState *parsed) {
         }
 
         if (current == mod_multiple) {
-            size_t groups = VLA_binding_get_size_t(level_group_counters, -1);
+            size_t groups = parsed->tokens[idx - 1] == character ? 2 : VLA_binding_get_size_t(level_group_counters, -1);
             DFA_State *previous_start = VLA_binding_get_DFA_State(start_node_stack, -groups);
             DFA_add_dummy_connection_between(current_start, previous_start);
             DFA_add_dummy_connection_between(previous_start, current_start);
         }
     }
+
+    DFA_State *last_start = VLA_binding_get_DFA_State(start_node_stack, -1);
+    DFA_State *last_stop = VLA_binding_get_DFA_State(end_node_stack, -1);
+    DFA_add_dummy_connection_between(last_start, last_stop);
 
     VLA_free(level_group_counters);
     VLA_free(start_node_stack);

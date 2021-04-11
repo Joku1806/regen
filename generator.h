@@ -21,6 +21,7 @@ typedef struct {
     DFA_State* stop;
 } DFA;
 
-DFA* generate_first_pass_from_parsed_regex(ParserState *parsed);
+DFA* generate_DFA_from_parsed_regex(ParserState *parsed);
+DFA* optimize_DFA_layout(DFA* dfa);
 
 #endif
