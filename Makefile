@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall
+CFLAGS=-g -Wall -DDEBUG
 OBJS=VLA.o parser.o generator.o main.o
 BIN=regen
 
