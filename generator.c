@@ -60,12 +60,24 @@ DFA_State *VLA_binding_get_DFA_State(VLA *v, signed long idx) {
     return (DFA_State *)VLA_get(v, idx);
 }
 
-void size_t_printer(void *address) {
-    printf("%lu", *(size_t *)address);
+void size_t_formatter(VLA* formatter, void *item) {
+    size_t casted = *(size_t *)item;
+    const int n = snprintf(NULL, 0, "%zu", casted);
+    char buffer[n + 1];
+    snprintf(buffer, n + 1, "%zu", casted);
+
+    VLA_append(formatter, &buffer, n);
 }
 
-void DFA_State_printer(void *address) {
-    printf("z%lu", ((DFA_State*)address)->id);
+void DFA_State_formatter(VLA* formatter, void *item) {
+    DFA_State* casted = (DFA_State*)item;
+    VLA_append(formatter, "z", 1);
+
+    const int n = snprintf(NULL, 0, "%zu", casted->id);
+    char buffer[n + 1];
+    snprintf(buffer, n + 1, "%zu", casted->id);
+
+    VLA_append(formatter, &buffer, n);
 }
 
 void increment_current_level_group_counter(VLA *levels) {
@@ -77,23 +89,23 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
     DFA *generated = construct_DFA();
     
     VLA *start_node_stack = VLA_initialize(2, sizeof(DFA_State));
-    VLA_set_item_printer(start_node_stack, DFA_State_printer);
+    VLA_set_item_formatter(start_node_stack, DFA_State_formatter);
     VLA *end_node_stack = VLA_initialize(2, sizeof(DFA_State));
-    VLA_set_item_printer(end_node_stack, DFA_State_printer);
+    VLA_set_item_formatter(end_node_stack, DFA_State_formatter);
     VLA_append(start_node_stack, generated->start, 1);
     VLA_append(end_node_stack, generated->stop, 1);
 
     VLA *level_group_counters = VLA_initialize(2, sizeof(size_t));
-    VLA_set_item_printer(level_group_counters, size_t_printer);
+    VLA_set_item_formatter(level_group_counters, size_t_formatter);
     VLA_append(level_group_counters, &(size_t){0}, 1);
 
     for (size_t idx = 0; idx < strlen(parsed->cleaned_regex); idx++) {
-        // printf("Current group counter stack is:\n");
-        // VLA_print(level_group_counters);
-        // printf("Current start stack is:\n");
-        // VLA_print(start_node_stack);
-        // printf("Current end stack is:\n");
-        // VLA_print(end_node_stack);
+        printf("Current group counter stack is:\n");
+        VLA_print(level_group_counters);
+        printf("Current start stack is:\n");
+        VLA_print(start_node_stack);
+        printf("Current end stack is:\n");
+        VLA_print(end_node_stack);
         Token current = parsed->tokens[idx];
         DFA_State *current_start = VLA_binding_get_DFA_State(start_node_stack, -1);
         DFA_State *current_stop = VLA_binding_get_DFA_State(end_node_stack, -1);
@@ -133,7 +145,6 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
         if (current == mod_choice) {
             size_t groups = VLA_binding_get_size_t(level_group_counters, -1);
             debug("Now stepping back %u starting nodes.\n", groups);
-            // TODO: Überlegen ob der group-counter nicht einfach auf 0 zurückgesezzt werden sollte
             VLA_delete_at_index_order_safe(level_group_counters, -1);
             for (size_t cnt = 0; cnt < groups; cnt++) {
                 // TODO: Löschen mit einem Funktionsaufruf unterstützen

@@ -49,15 +49,17 @@ Token VLA_binding_get_Token(VLA *v, signed long idx) {
     return *(Token *)VLA_get(v, idx);
 }
 
-void Token_printer(void *address) {
-    printf("%s", get_token_description(*(Token *)address));
+void Token_formatter(VLA* formatter, void *item) {
+    Token casted = *(Token *)item;
+    char* description = get_token_description(casted);
+    VLA_append(formatter, description, strlen(description));
 }
 
 ParserState* parse_regex(char *regex) {
     ParserState *state = construct_parser_state(regex);
     VLA *token_history = VLA_initialize(strlen(regex), sizeof(Token));
     VLA_set_data_freeing_policy(token_history, persistent);
-    VLA_set_item_printer(token_history, Token_printer);
+    VLA_set_item_formatter(token_history, Token_formatter);
 
     // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
     // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.

@@ -11,17 +11,18 @@ typedef enum {
     freeable
 } data_policy;
 
-typedef struct {
+typedef struct VLA VLA;
+struct VLA {
     size_t capacity;
     size_t length;
     size_t item_size;
     uint8_t* data;
     data_policy data_freeing_policy;
-    void (*item_printer)(void *at);
-} VLA;
+    void (*item_formatter)(VLA* formatter, void *item);
+};
 
 VLA* VLA_initialize(size_t capacity, size_t item_size);
-void VLA_set_item_printer(VLA* v, void (*item_printer)(void *at));
+void VLA_set_item_formatter(VLA* v, void (*item_formatter)(VLA* formatter, void *item));
 void VLA_set_data_freeing_policy(VLA* v, data_policy policy);
 void VLA_assert_item_size_matches(VLA* v, size_t item_size);
 void VLA_append(VLA* v, void* address, size_t amount);

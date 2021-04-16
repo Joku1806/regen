@@ -16,13 +16,13 @@ VLA* VLA_initialize(size_t capacity, size_t item_size) {
     v->item_size = item_size;
     v->data = malloc(capacity * item_size);
     v->data_freeing_policy = freeable;
-    v->item_printer = NULL;
+    v->item_formatter = NULL;
 
     return v;
 }
 
-void VLA_set_item_printer(VLA* v, void (*item_printer)(void *at)) {
-    v->item_printer = item_printer;
+void VLA_set_item_formatter(VLA* v, void (*item_formatter)(VLA* formatter, void *item)) {
+    v->item_formatter = item_formatter;
 }
 
 void VLA_set_data_freeing_policy(VLA* v, data_policy policy) {
@@ -104,20 +104,51 @@ void* VLA_get(VLA* v, signed long idx) {
     return (void *)(v->data + idx * v->item_size);
 }
 
+void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
+    int chars_written;
+    const int n = snprintf(NULL, 0, "%zu", SIZE_MAX);
+    char buffer[n + 1];
+    
+    VLA_append(formatter, "VLA with Item size: ", 20);
+    chars_written = snprintf(buffer, n + 1, "%zu", v->item_size);
+    VLA_append(formatter, buffer, chars_written);
+    VLA_append(formatter, " Bytes -- Space used: ", 22);
+    chars_written = snprintf(buffer, n + 1, "%zu", v->length);
+    VLA_append(formatter, buffer, chars_written);
+    VLA_append(formatter, "/", 1);
+    chars_written = snprintf(buffer, n + 1, "%zu", v->capacity);
+    VLA_append(formatter, buffer, chars_written);
+    VLA_append(formatter, " Bytes (", 8);
+
+    if (v->data_freeing_policy == freeable) {
+        VLA_append(formatter, "freeable", 8);
+    } else {
+        VLA_append(formatter, "immutable", 9);
+    }
+
+    VLA_append(formatter, ") ", 2);
+}
+
+void VLA_print_dump_data(VLA* v, VLA* formatter) {
+    if (v->length > 0) VLA_append(formatter, "| ", 2);
+    for (size_t offset = 0; offset < v->length; offset += v->item_size) {
+        v->item_formatter(formatter, v->data + offset);
+        VLA_append(formatter, " | ", 3);
+    }
+}
+
 void VLA_print(VLA* v) {
-    if (v->item_printer == NULL) {
-        warn("Item printer is not set for this VLA, returning.\n");
+    if (v->item_formatter == NULL) {
+        warn("Item formatter is not set for this VLA, returning.\n");
         return;
     }
 
-    // TODO: Erstmal alles in String schreiben, erst dann ausgeben, ermöglicht besseres Layout und Ausgabe mit debug()
-    printf("VLA with Item size: %lu Bytes -- Space: %lu/%lu Bytes (%s)\n", v->item_size, v->length, v->capacity, v->data_freeing_policy == freeable ? "freeable" : "immutable");
-    if (v->length > 0) printf("| ");
-    for (size_t offset = 0; offset < v->length; offset += v->item_size) {
-        v->item_printer(v->data + offset);
-        printf(" | ");
-    }
-    printf("\n\n");
+    VLA* output = VLA_initialize(v->length / v->item_size * 3, sizeof(char)); // Rekursion!
+    VLA_print_setup_information_header(v, output);
+    VLA_print_dump_data(v, output);
+
+    debug("%s\n", (char*)output->data);
+    VLA_free(output);
 }
 
 // Löscht den VLA selbst und optional auch den data-Array
