@@ -2,6 +2,7 @@
 #define GENERATOR_H
 
 #include "VLA.h"
+#include "stack.h"
 
 typedef struct DFA_State DFA_State;
 typedef struct Transition Transition;

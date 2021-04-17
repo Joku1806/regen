@@ -32,7 +32,7 @@ Transition* construct_DFA_Transition(char* matching, DFA_State *to) {
 }
 
 void DFA_add_connection_between(DFA_State *from, DFA_State *to, char *matching) {
-    if (from == NULL || to == NULL) panic("At least one of the states doesn't exist, can't from connection between them.\n");
+    if (from == NULL || to == NULL) panic("At least one of the states doesn't exist, can't form connection between them.\n");
     debug("Now adding connection from z%u to z%u matching %s.\n", from->id, to->id, matching);
     Transition *connection = construct_DFA_Transition(matching, to);
     VLA_append(from->transitions, connection, 1);
@@ -88,27 +88,27 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
     size_t id_counter = 2;
     DFA *generated = construct_DFA();
     
-    VLA *start_node_stack = VLA_initialize(2, sizeof(DFA_State));
-    VLA_set_item_formatter(start_node_stack, DFA_State_formatter);
-    VLA *end_node_stack = VLA_initialize(2, sizeof(DFA_State));
-    VLA_set_item_formatter(end_node_stack, DFA_State_formatter);
-    VLA_append(start_node_stack, generated->start, 1);
-    VLA_append(end_node_stack, generated->stop, 1);
+    Stack* start_nodes = stack_initialize(2, sizeof(DFA_State));
+    VLA_set_item_formatter(start_nodes, DFA_State_formatter);
+    Stack* stop_nodes = stack_initialize(2, sizeof(DFA_State));
+    VLA_set_item_formatter(stop_nodes, DFA_State_formatter);
+    
+    stack_push_n(start_nodes, generated->start, 1);
+    stack_push_n(stop_nodes, generated->stop, 1);
 
-    VLA *level_group_counters = VLA_initialize(2, sizeof(size_t));
+    Stack* level_group_counters = stack_initialize(2, sizeof(size_t));
     VLA_set_item_formatter(level_group_counters, size_t_formatter);
-    VLA_append(level_group_counters, &(size_t){0}, 1);
+    
+    stack_push_n(level_group_counters, &(size_t){0}, 1);
 
     for (size_t idx = 0; idx < strlen(parsed->cleaned_regex); idx++) {
-        printf("Current group counter stack is:\n");
         VLA_print(level_group_counters);
-        printf("Current start stack is:\n");
-        VLA_print(start_node_stack);
-        printf("Current end stack is:\n");
-        VLA_print(end_node_stack);
+        VLA_print(start_nodes);
+        VLA_print(stop_nodes);
+
         Token current = parsed->tokens[idx];
-        DFA_State *current_start = VLA_binding_get_DFA_State(start_node_stack, -1);
-        DFA_State *current_stop = VLA_binding_get_DFA_State(end_node_stack, -1);
+        DFA_State *current_start = VLA_binding_get_DFA_State(start_nodes, -1);
+        DFA_State *current_stop = VLA_binding_get_DFA_State(stop_nodes, -1);
         
         if (current == block_open) {
             DFA_State *start = construct_DFA_State(id_counter);
@@ -116,17 +116,17 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
             DFA_State *stop = construct_DFA_State(id_counter);
             id_counter++;
             DFA_add_dummy_connection_between(current_start, start);
-            VLA_append(start_node_stack, start, 1);
-            VLA_append(end_node_stack, stop, 1);
+            stack_push_n(start_nodes, start, 1);
+            stack_push_n(stop_nodes, stop, 1);
 
             increment_current_level_group_counter(level_group_counters);
-            VLA_append(level_group_counters, &(size_t){0}, 1);
+            stack_push_n(level_group_counters, &(size_t){0}, 1);
         }
 
         if (current == block_close) {
             DFA_add_dummy_connection_between(current_start, current_stop);
-            VLA_delete_at_index_order_safe(end_node_stack, -1);
-            VLA_append(start_node_stack, current_stop, 1);
+            stack_pop_n(stop_nodes, 1);
+            stack_push_n(start_nodes, current_stop, 1);
             increment_current_level_group_counter(level_group_counters);
         }
         
@@ -137,7 +137,7 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
             char *matching = calloc(character_group_length + 1, sizeof(char));
             strncpy(matching, parsed->cleaned_regex + idx, character_group_length);
             DFA_add_connection_between(current_start, new, matching);
-            VLA_append(start_node_stack, new, 1);
+            stack_push_n(start_nodes, new, 1);
             increment_current_level_group_counter(level_group_counters);
             idx += character_group_length - 1;
         }
@@ -145,29 +145,26 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
         if (current == mod_choice) {
             size_t groups = VLA_binding_get_size_t(level_group_counters, -1);
             debug("Now stepping back %u starting nodes.\n", groups);
-            VLA_delete_at_index_order_safe(level_group_counters, -1);
-            for (size_t cnt = 0; cnt < groups; cnt++) {
-                // TODO: Löschen mit einem Funktionsaufruf unterstützen
-                VLA_delete_at_index_order_safe(start_node_stack, -1);
-            }
+            stack_pop_n(level_group_counters, 1);
+            stack_pop_n(start_nodes, groups);
             DFA_add_dummy_connection_between(current_start, current_stop);
         }
 
         if (current == mod_multiple) {
             size_t groups = parsed->tokens[idx - 1] == character ? 2 : VLA_binding_get_size_t(level_group_counters, -1);
-            DFA_State *previous_start = VLA_binding_get_DFA_State(start_node_stack, -groups);
+            DFA_State *previous_start = VLA_binding_get_DFA_State(start_nodes, -groups);
             DFA_add_dummy_connection_between(current_start, previous_start);
             DFA_add_dummy_connection_between(previous_start, current_start);
         }
     }
 
-    DFA_State *last_start = VLA_binding_get_DFA_State(start_node_stack, -1);
-    DFA_State *last_stop = VLA_binding_get_DFA_State(end_node_stack, -1);
+    DFA_State *last_start = VLA_binding_get_DFA_State(start_nodes, -1);
+    DFA_State *last_stop = VLA_binding_get_DFA_State(stop_nodes, -1);
     DFA_add_dummy_connection_between(last_start, last_stop);
 
     VLA_free(level_group_counters);
-    VLA_free(start_node_stack);
-    VLA_free(end_node_stack);
+    VLA_free(start_nodes);
+    VLA_free(stop_nodes);
 
     return generated;
 }
