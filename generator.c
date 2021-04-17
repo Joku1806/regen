@@ -3,24 +3,25 @@
 #include "parser.h"
 #include "generator.h"
 
-static DFA_State* construct_DFA_State(size_t id);
+static DFA_State* construct_DFA_State(size_t* id);
 static DFA* construct_DFA();
 static Transition* construct_DFA_Transition(char* matching, DFA_State *to);
 static void DFA_add_connection_between(DFA_State *from, DFA_State *to, char *matching);
 static void DFA_add_dummy_connection_between(DFA_State *from, DFA_State *to);
 static size_t get_continuous_character_group_length(char *regex, Token *tokens, size_t starting_at);
 
-DFA_State* construct_DFA_State(size_t id) {
+DFA_State* construct_DFA_State(size_t* id) {
     DFA_State *new = malloc(sizeof(DFA_State));
     new->transitions = VLA_initialize(1, sizeof(Transition));
-    new->id = id;
+    new->id = *id;
+    *id += 1;
     return new;
 }
 
-DFA* construct_DFA() {
+DFA* construct_DFA(size_t* state_start_id) {
     DFA* new = malloc(sizeof(DFA));
-    new->start = construct_DFA_State(0);
-    new->stop = construct_DFA_State(1);
+    new->start = construct_DFA_State(state_start_id);
+    new->stop = construct_DFA_State(state_start_id);
     return new;
 }
 
@@ -85,8 +86,8 @@ void increment_current_level_group_counter(VLA *levels) {
 }
 
 DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
-    size_t id_counter = 2;
-    DFA *generated = construct_DFA();
+    size_t id_counter = 0;
+    DFA *generated = construct_DFA(&id_counter);
     
     Stack* start_nodes = stack_initialize(2, sizeof(DFA_State));
     VLA_set_item_formatter(start_nodes, DFA_State_formatter);
@@ -111,10 +112,9 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
         DFA_State *current_stop = VLA_binding_get_DFA_State(stop_nodes, -1);
         
         if (current == block_open) {
-            DFA_State *start = construct_DFA_State(id_counter);
-            id_counter++;
-            DFA_State *stop = construct_DFA_State(id_counter);
-            id_counter++;
+            DFA_State *start = construct_DFA_State(&id_counter);
+            DFA_State *stop = construct_DFA_State(&id_counter);
+            
             DFA_add_dummy_connection_between(current_start, start);
             stack_push_n(start_nodes, start, 1);
             stack_push_n(stop_nodes, stop, 1);
@@ -131,8 +131,7 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
         }
         
         if (current == character) {
-            DFA_State *new = construct_DFA_State(id_counter);
-            id_counter++;
+            DFA_State *new = construct_DFA_State(&id_counter);
             size_t character_group_length = get_continuous_character_group_length(parsed->cleaned_regex, parsed->tokens, idx);
             char *matching = calloc(character_group_length + 1, sizeof(char));
             strncpy(matching, parsed->cleaned_regex + idx, character_group_length);
