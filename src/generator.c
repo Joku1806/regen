@@ -3,43 +3,74 @@
 #include "parser.h"
 #include "generator.h"
 
-static NFA_State* construct_NFA_State(size_t* id);
-static NFA* construct_NFA();
-static Transition* construct_NFA_Transition(char* matching, NFA_State *to);
-static void NFA_add_connection_between(NFA_State *from, NFA_State *to, char *matching);
-static void NFA_add_empty_connection_between(NFA_State *from, NFA_State *to);
+static GeneratorState *construct_GeneratorState();
+static NFA_Node *construct_NFA_Node(size_t *id);
+static NFA *construct_NFA();
+static Transition *construct_NFA_Transition(char *matching, NFA_Node *to);
+static void NFA_add_connection_between(NFA_Node *from, NFA_Node *to, char *matching);
+static void NFA_add_empty_connection_between(NFA_Node *from, NFA_Node *to);
 static size_t get_continuous_character_group_length(char *regex, Token *tokens, size_t starting_at);
+static void NFA_Node_formatter(VLA *formatter, void *item);
+static void size_t_formatter(VLA *formatter, void *item);
 
-NFA_State* construct_NFA_State(size_t* id) {
-    NFA_State *new = malloc(sizeof(NFA_State));
+GeneratorState *construct_GeneratorState() {
+    GeneratorState *new = malloc(sizeof(GeneratorState));
+    new->start_nodes = stack_initialize(2, sizeof(NFA_Node));
+    new->stop_nodes = stack_initialize(2, sizeof(NFA_Node));
+    new->group_counters = stack_initialize(2, sizeof(size_t));
+    new->global_node_index = calloc(1, sizeof(size_t));
+    new->token_index = 0;
+    new->generated = construct_NFA(new->global_node_index);
+
+    stack_push_n(new->start_nodes, new->generated->start, 1);
+    stack_push_n(new->stop_nodes, new->generated->stop, 1);
+    stack_push_n(new->group_counters, &(size_t){0}, 1);
+
+    VLA_set_item_formatter(new->start_nodes, NFA_Node_formatter);
+    VLA_set_item_formatter(new->stop_nodes, NFA_Node_formatter);
+    VLA_set_item_formatter(new->group_counters, size_t_formatter);
+
+    return new;
+}
+
+void destruct_GeneratorState(GeneratorState *state) {
+    VLA_free(state->group_counters);
+    VLA_free(state->start_nodes);
+    VLA_free(state->stop_nodes);
+    free(state->global_node_index);
+    free(state);
+}
+
+NFA_Node *construct_NFA_Node(size_t *id) {
+    NFA_Node *new = malloc(sizeof(NFA_Node));
     new->transitions = VLA_initialize(1, sizeof(Transition));
     new->id = *id;
     *id += 1;
     return new;
 }
 
-NFA* construct_NFA(size_t* state_start_id) {
-    NFA* new = malloc(sizeof(NFA));
-    new->start = construct_NFA_State(state_start_id);
-    new->stop = construct_NFA_State(state_start_id);
+NFA *construct_NFA(size_t *state_start_id) {
+    NFA *new = malloc(sizeof(NFA));
+    new->start = construct_NFA_Node(state_start_id);
+    new->stop = construct_NFA_Node(state_start_id);
     return new;
 }
 
-Transition* construct_NFA_Transition(char* matching, NFA_State *to) {
+Transition *construct_NFA_Transition(char *matching, NFA_Node *to) {
     Transition *new = malloc(sizeof(Transition));
     new->matching = matching;
     new->advance_to = to;
     return new;
 }
 
-void NFA_add_connection_between(NFA_State *from, NFA_State *to, char *matching) {
+void NFA_add_connection_between(NFA_Node *from, NFA_Node *to, char *matching) {
     if (from == NULL || to == NULL) panic("At least one of the states doesn't exist, can't form connection between them.\n");
-    debug("Now adding connection from z%u to z%u matching %s.\n", from->id, to->id, matching);
+    debug("Now adding connection from z%lu to z%lu matching %s.\n", from->id, to->id, matching);
     Transition *connection = construct_NFA_Transition(matching, to);
     VLA_append(from->transitions, connection, 1);
 }
 
-void NFA_add_empty_connection_between(NFA_State *from, NFA_State *to) {
+void NFA_add_empty_connection_between(NFA_Node *from, NFA_Node *to) {
     NFA_add_connection_between(from, to, NULL);
 }
 
@@ -56,12 +87,12 @@ size_t VLA_binding_get_size_t(VLA *v, signed long idx) {
     return *(size_t *)VLA_get(v, idx);
 }
 
-NFA_State *VLA_binding_get_NFA_State(VLA *v, signed long idx) {
-    VLA_assert_item_size_matches(v, sizeof(NFA_State));
-    return (NFA_State *)VLA_get(v, idx);
+NFA_Node *VLA_binding_get_NFA_Node(VLA *v, signed long idx) {
+    VLA_assert_item_size_matches(v, sizeof(NFA_Node));
+    return (NFA_Node *)VLA_get(v, idx);
 }
 
-void size_t_formatter(VLA* formatter, void *item) {
+void size_t_formatter(VLA *formatter, void *item) {
     size_t casted = *(size_t *)item;
     const int n = snprintf(NULL, 0, "%zu", casted);
     char buffer[n + 1];
@@ -70,8 +101,8 @@ void size_t_formatter(VLA* formatter, void *item) {
     VLA_append(formatter, &buffer, n);
 }
 
-void NFA_State_formatter(VLA* formatter, void *item) {
-    NFA_State* casted = (NFA_State*)item;
+void NFA_Node_formatter(VLA *formatter, void *item) {
+    NFA_Node *casted = (NFA_Node *)item;
     VLA_append(formatter, "z", 1);
 
     const int n = snprintf(NULL, 0, "%zu", casted->id);
@@ -81,89 +112,95 @@ void NFA_State_formatter(VLA* formatter, void *item) {
     VLA_append(formatter, &buffer, n);
 }
 
-void increment_current_level_group_counter(VLA *levels) {
+void increment_current_group_counter(VLA *levels) {
     VLA_replace_at_index(levels, &(size_t){VLA_binding_get_size_t(levels, -1) + 1}, -1);
 }
 
-NFA* generate_NFA_from_parsed_regex(ParserState *parsed) {
-    size_t id_counter = 0;
-    NFA *generated = construct_NFA(&id_counter);
-    
-    Stack* start_nodes = stack_initialize(2, sizeof(NFA_State));
-    VLA_set_item_formatter(start_nodes, NFA_State_formatter);
-    Stack* stop_nodes = stack_initialize(2, sizeof(NFA_State));
-    VLA_set_item_formatter(stop_nodes, NFA_State_formatter);
-    
-    stack_push_n(start_nodes, generated->start, 1);
-    stack_push_n(stop_nodes, generated->stop, 1);
+void advance_current_path(GeneratorState *state, ParserState *parsed) {
+    NFA_Node *last_start = VLA_binding_get_NFA_Node(state->start_nodes, -1);
+    NFA_Node *new = construct_NFA_Node(state->global_node_index);
+    size_t character_group_length = get_continuous_character_group_length(parsed->cleaned_regex, parsed->tokens, state->token_index);
+    char *matching = calloc(character_group_length + 1, sizeof(char));
 
-    Stack* level_group_counters = stack_initialize(2, sizeof(size_t));
-    VLA_set_item_formatter(level_group_counters, size_t_formatter);
-    
-    stack_push_n(level_group_counters, &(size_t){0}, 1);
+    strncpy(matching, parsed->cleaned_regex + state->token_index, character_group_length);
+    NFA_add_connection_between(last_start, new, matching);
+    stack_push_n(state->start_nodes, new, 1);
+    increment_current_group_counter(state->group_counters);
+    state->token_index += character_group_length - 1;
+}
 
-    for (size_t idx = 0; idx < strlen(parsed->cleaned_regex); idx++) {
-        VLA_print(level_group_counters);
-        VLA_print(start_nodes);
-        VLA_print(stop_nodes);
+void finish_current_path(GeneratorState *state) {
+    size_t groups = VLA_binding_get_size_t(state->group_counters, -1);
+    NFA_Node *last_start = VLA_binding_get_NFA_Node(state->start_nodes, -1);
+    NFA_Node *path_stop = VLA_binding_get_NFA_Node(state->stop_nodes, -1);
 
-        Token current = parsed->tokens[idx];
-        NFA_State *current_start = VLA_binding_get_NFA_State(start_nodes, -1);
-        NFA_State *current_stop = VLA_binding_get_NFA_State(stop_nodes, -1);
-        
-        if (current == block_open) {
-            NFA_State *start = construct_NFA_State(&id_counter);
-            NFA_State *stop = construct_NFA_State(&id_counter);
-            
-            NFA_add_empty_connection_between(current_start, start);
-            stack_push_n(start_nodes, start, 1);
-            stack_push_n(stop_nodes, stop, 1);
+    debug("Now stepping back %u starting nodes.\n", groups);
+    stack_pop_n(state->group_counters, 1);
+    stack_pop_n(state->start_nodes, groups);
+    NFA_add_empty_connection_between(last_start, path_stop);
+}
 
-            increment_current_level_group_counter(level_group_counters);
-            stack_push_n(level_group_counters, &(size_t){0}, 1);
-        }
+void loop_current_path(GeneratorState *state, ParserState *parsed) {
+    size_t groups = parsed->tokens[state->token_index - 1] == character ? 2 : VLA_binding_get_size_t(state->group_counters, -1);
+    NFA_Node *loop_start = VLA_binding_get_NFA_Node(state->start_nodes, -groups);
+    NFA_Node *loop_stop = VLA_binding_get_NFA_Node(state->start_nodes, -1);
 
-        if (current == block_close) {
-            NFA_add_empty_connection_between(current_start, current_stop);
-            stack_pop_n(stop_nodes, 1);
-            stack_push_n(start_nodes, current_stop, 1);
-            increment_current_level_group_counter(level_group_counters);
-        }
-        
-        if (current == character) {
-            NFA_State *new = construct_NFA_State(&id_counter);
-            size_t character_group_length = get_continuous_character_group_length(parsed->cleaned_regex, parsed->tokens, idx);
-            char *matching = calloc(character_group_length + 1, sizeof(char));
-            strncpy(matching, parsed->cleaned_regex + idx, character_group_length);
-            NFA_add_connection_between(current_start, new, matching);
-            stack_push_n(start_nodes, new, 1);
-            increment_current_level_group_counter(level_group_counters);
-            idx += character_group_length - 1;
-        }
+    NFA_add_empty_connection_between(loop_start, loop_stop);
+    NFA_add_empty_connection_between(loop_stop, loop_start);
+}
 
-        if (current == mod_choice) {
-            size_t groups = VLA_binding_get_size_t(level_group_counters, -1);
-            debug("Now stepping back %u starting nodes.\n", groups);
-            stack_pop_n(level_group_counters, 1);
-            stack_pop_n(start_nodes, groups);
-            NFA_add_empty_connection_between(current_start, current_stop);
-        }
+void open_new_block_level(GeneratorState *state) {
+    NFA_Node *last_start = VLA_binding_get_NFA_Node(state->start_nodes, -1);
+    NFA_Node *start = construct_NFA_Node(state->global_node_index);
+    NFA_Node *stop = construct_NFA_Node(state->global_node_index);
 
-        if (current == mod_multiple) {
-            size_t groups = parsed->tokens[idx - 1] == character ? 2 : VLA_binding_get_size_t(level_group_counters, -1);
-            NFA_State *previous_start = VLA_binding_get_NFA_State(start_nodes, -groups);
-            NFA_add_empty_connection_between(current_start, previous_start);
-            NFA_add_empty_connection_between(previous_start, current_start);
-        }
+    NFA_add_empty_connection_between(last_start, start);
+    stack_push_n(state->start_nodes, start, 1);
+    stack_push_n(state->stop_nodes, stop, 1);
+
+    increment_current_group_counter(state->group_counters);
+    stack_push_n(state->group_counters, &(size_t){0}, 1);
+}
+
+void close_current_block_level(GeneratorState *state) {
+    NFA_Node *last_start = VLA_binding_get_NFA_Node(state->start_nodes, -1);
+    NFA_Node *block_stop = VLA_binding_get_NFA_Node(state->stop_nodes, -1);
+
+    NFA_add_empty_connection_between(last_start, block_stop);
+    stack_pop_n(state->stop_nodes, 1);
+    stack_push_n(state->start_nodes, block_stop, 1);
+    increment_current_group_counter(state->group_counters);
+}
+
+NFA *generate_NFA_from_parsed_regex(ParserState *parsed) {
+    GeneratorState *state = construct_GeneratorState();
+
+    while (state->token_index < strlen(parsed->cleaned_regex)) {
+        VLA_print(state->group_counters);
+        VLA_print(state->start_nodes);
+        VLA_print(state->stop_nodes);
+
+        Token current = parsed->tokens[state->token_index];
+
+        if (current == block_open)
+            open_new_block_level(state);
+        else if (current == block_close)
+            close_current_block_level(state);
+        else if (current == character)
+            advance_current_path(state, parsed);
+        else if (current == mod_choice)
+            finish_current_path(state);
+        else if (current == mod_multiple)
+            loop_current_path(state, parsed);
+        else
+            warn("Encountered unexpected token %s, should have been removed in the parsing stage.\n", get_token_description(current));
+
+        state->token_index++;
     }
 
-    NFA_State *last_start = VLA_binding_get_NFA_State(start_nodes, -1);
-    NFA_State *last_stop = VLA_binding_get_NFA_State(stop_nodes, -1);
-    NFA_add_empty_connection_between(last_start, last_stop);
-
-    VLA_free(level_group_counters);
-    VLA_free(start_nodes);
-    VLA_free(stop_nodes);
+    finish_current_path(state);
+    NFA *generated = state->generated;
+    destruct_GeneratorState(state);
 
     return generated;
 }
