@@ -1,15 +1,29 @@
 CC=gcc
-CFLAGS=-g -Wall -DDEBUG
-OBJS=VLA.o parser.o generator.o main.o
-BIN=regen
+CFLAGS=-Wall
+
+SRC=src
+OBJ=obj
+SRCS=$(wildcard $(SRC)/*.c)
+OBJS=$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
+
+BINDIR=bin
+BIN=$(BINDIR)/regen
 
 all: $(BIN)
 
-regen: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -lm -o regen
+debug: CFLAGS=-Wall -g -rdynamic -O0 -DDEBUG
+debug: clean
+debug: $(BIN)
 
-%.o: %.c
+release: CFLAGS=-Wall -O2 -DNDEBUG 
+release: clean
+release: $(BIN)
+
+$(BIN): $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -lm -o $@
+
+$(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	$(RM) -r regen *.o
+	$(RM) -r $(BINDIR)/* $(OBJ)/*

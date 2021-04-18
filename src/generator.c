@@ -7,7 +7,7 @@ static DFA_State* construct_DFA_State(size_t* id);
 static DFA* construct_DFA();
 static Transition* construct_DFA_Transition(char* matching, DFA_State *to);
 static void DFA_add_connection_between(DFA_State *from, DFA_State *to, char *matching);
-static void DFA_add_dummy_connection_between(DFA_State *from, DFA_State *to);
+static void DFA_add_empty_connection_between(DFA_State *from, DFA_State *to);
 static size_t get_continuous_character_group_length(char *regex, Token *tokens, size_t starting_at);
 
 DFA_State* construct_DFA_State(size_t* id) {
@@ -39,7 +39,7 @@ void DFA_add_connection_between(DFA_State *from, DFA_State *to, char *matching) 
     VLA_append(from->transitions, connection, 1);
 }
 
-void DFA_add_dummy_connection_between(DFA_State *from, DFA_State *to) {
+void DFA_add_empty_connection_between(DFA_State *from, DFA_State *to) {
     DFA_add_connection_between(from, to, NULL);
 }
 
@@ -115,7 +115,7 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
             DFA_State *start = construct_DFA_State(&id_counter);
             DFA_State *stop = construct_DFA_State(&id_counter);
             
-            DFA_add_dummy_connection_between(current_start, start);
+            DFA_add_empty_connection_between(current_start, start);
             stack_push_n(start_nodes, start, 1);
             stack_push_n(stop_nodes, stop, 1);
 
@@ -124,7 +124,7 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
         }
 
         if (current == block_close) {
-            DFA_add_dummy_connection_between(current_start, current_stop);
+            DFA_add_empty_connection_between(current_start, current_stop);
             stack_pop_n(stop_nodes, 1);
             stack_push_n(start_nodes, current_stop, 1);
             increment_current_level_group_counter(level_group_counters);
@@ -146,20 +146,20 @@ DFA* generate_DFA_from_parsed_regex(ParserState *parsed) {
             debug("Now stepping back %u starting nodes.\n", groups);
             stack_pop_n(level_group_counters, 1);
             stack_pop_n(start_nodes, groups);
-            DFA_add_dummy_connection_between(current_start, current_stop);
+            DFA_add_empty_connection_between(current_start, current_stop);
         }
 
         if (current == mod_multiple) {
             size_t groups = parsed->tokens[idx - 1] == character ? 2 : VLA_binding_get_size_t(level_group_counters, -1);
             DFA_State *previous_start = VLA_binding_get_DFA_State(start_nodes, -groups);
-            DFA_add_dummy_connection_between(current_start, previous_start);
-            DFA_add_dummy_connection_between(previous_start, current_start);
+            DFA_add_empty_connection_between(current_start, previous_start);
+            DFA_add_empty_connection_between(previous_start, current_start);
         }
     }
 
     DFA_State *last_start = VLA_binding_get_DFA_State(start_nodes, -1);
     DFA_State *last_stop = VLA_binding_get_DFA_State(stop_nodes, -1);
-    DFA_add_dummy_connection_between(last_start, last_stop);
+    DFA_add_empty_connection_between(last_start, last_stop);
 
     VLA_free(level_group_counters);
     VLA_free(start_nodes);
