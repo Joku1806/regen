@@ -1,10 +1,10 @@
 CC=gcc
 CFLAGS=-Wall
 
-SRC=src
-OBJ=obj
-SRCS=$(wildcard $(SRC)/*.c)
-OBJS=$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCS))
+SRCDIR=src
+OBJDIR=obj
+SRCS=$(wildcard $(SRCDIR)/*.c)
+OBJS=$(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
 
 BINDIR=bin
 BIN=$(BINDIR)/regen
@@ -22,8 +22,8 @@ release: $(BIN)
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -lm -o $@
 
-$(OBJ)/%.o: $(SRC)/%.c
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	$(RM) -r $(BINDIR)/* $(OBJ)/*
+	$(RM) -r $(BINDIR)/* $(OBJDIR)/*
