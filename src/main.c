@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     if (!state->invalid) {
         printf("%s ist ein syntaktisch richtiger Regex. Herzlichen Glückwunsch!\n", regex);
         // einfach nur sehen ob es kompiliert
-        DFA* generated = generate_DFA_from_parsed_regex(state);
+        NFA* generated = generate_NFA_from_parsed_regex(state);
         return 1;
     } else {
         printf("%s ist kein syntaktisch richtiger Regex.\n", regex);

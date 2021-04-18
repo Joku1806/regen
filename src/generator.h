@@ -4,25 +4,25 @@
 #include "VLA.h"
 #include "stack.h"
 
-typedef struct DFA_State DFA_State;
+typedef struct NFA_State NFA_State;
 typedef struct Transition Transition;
 
 struct Transition {
     char *matching;
-    DFA_State *advance_to;
+    NFA_State *advance_to;
 };
 
-struct DFA_State {
+struct NFA_State {
     VLA *transitions;
     size_t id;
 };
 
 typedef struct {
-    DFA_State* start;
-    DFA_State* stop;
-} DFA;
+    NFA_State* start;
+    NFA_State* stop;
+} NFA;
 
-DFA* generate_DFA_from_parsed_regex(ParserState *parsed);
-DFA* optimize_DFA_layout(DFA* dfa);
+NFA* generate_NFA_from_parsed_regex(ParserState *parsed);
+NFA* optimize_NFA_layout(NFA* NFA);
 
 #endif
