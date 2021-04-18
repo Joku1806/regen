@@ -15,8 +15,8 @@ typedef enum {
 } Token;
 
 typedef struct {
-    Token *tokens;
-    char *cleaned_regex;
+    Token* tokens;
+    char* cleaned_regex;
     int escape_active;
     int open_blocks;
     int invalid;
@@ -36,7 +36,7 @@ ParserState* construct_parser_state();
 Token get_token_type(char token, int escape_active);
 char* get_token_description(Token token);
 // Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist (semantisch ist nochmal ne Ecke schwerer)
-ParserState* parse_regex(char *regex);
+ParserState* parse_regex(char* regex);
 
 // Gibt alle Tokens im VLA auf stdin aus.
 void VLA_print_tokens(VLA* v);

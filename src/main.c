@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     }
 
     char* regex = argv[1];
-    ParserState *state = parse_regex(regex);
+    ParserState* state = parse_regex(regex);
     if (!state->invalid) {
         printf("%s ist ein syntaktisch richtiger Regex. Herzlichen Glückwunsch!\n", regex);
         // einfach nur sehen ob es kompiliert

@@ -21,7 +21,7 @@ VLA* VLA_initialize(size_t capacity, size_t item_size) {
     return v;
 }
 
-void VLA_set_item_formatter(VLA* v, void (*item_formatter)(VLA* formatter, void *item)) {
+void VLA_set_item_formatter(VLA* v, void (*item_formatter)(VLA* formatter, void* item)) {
     v->item_formatter = item_formatter;
 }
 
@@ -42,8 +42,10 @@ void VLA_assert_item_size_matches(VLA* v, size_t item_size) {
 }
 
 size_t VLA_normalize_index(VLA* v, signed long idx) {
-    if (idx < 0) return v->length / v->item_size + idx;
-    else return idx;
+    if (idx < 0)
+        return v->length / v->item_size + idx;
+    else
+        return idx;
 }
 
 // Vergrößert die capacity des VLA um factor.
@@ -101,14 +103,14 @@ void* VLA_get(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
 
-    return (void *)(v->data + idx * v->item_size);
+    return (void*)(v->data + idx * v->item_size);
 }
 
 void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
     int chars_written;
     const int n = snprintf(NULL, 0, "%zu", SIZE_MAX);
     char buffer[n + 1];
-    
+
     VLA_append(formatter, "VLA with Item size: ", 20);
     chars_written = snprintf(buffer, n + 1, "%zu", v->item_size);
     VLA_append(formatter, buffer, chars_written);
@@ -143,7 +145,7 @@ void VLA_print(VLA* v) {
         return;
     }
 
-    VLA* output = VLA_initialize(v->length / v->item_size * 3, sizeof(char)); // Rekursion!
+    VLA* output = VLA_initialize(v->length / v->item_size * 3, sizeof(char));  // Rekursion!
     VLA_print_setup_information_header(v, output);
     VLA_print_dump_data(v, output);
 
