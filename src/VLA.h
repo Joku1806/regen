@@ -5,9 +5,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// TODO: besseren Namen dafür finden
+#define INFO_HEADER_SIZE 128
+
 typedef enum {
-    persistent,
+    immutable,
     freeable
 } data_policy;
 
@@ -30,6 +31,7 @@ void VLA_replace_at_index(VLA* v, void* address, signed long idx);
 void VLA_delete_at_index(VLA* v, signed long idx);
 void VLA_delete_at_index_order_safe(VLA* v, signed long idx);
 void* VLA_get(VLA* v, signed long idx);
+size_t VLA_get_length(VLA* v);
 void VLA_print(VLA* v);
 void VLA_free(VLA* v);
 

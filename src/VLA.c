@@ -6,6 +6,11 @@
 
 // Initialisiert einen VLA mit capacity vielen Bytes reserviert.
 VLA* VLA_initialize(size_t capacity, size_t item_size) {
+    if (capacity == 0) {
+        warn("Because of the expansion strategy of this implementation, an initial capacity > 0 is needed.\n\tProceeding with default value of 1.\n");
+        capacity = 1;
+    }
+
     VLA* v = calloc(1, sizeof(VLA));
     if (v == NULL) {
         panic("%s\n", strerror(errno));
@@ -42,15 +47,13 @@ void VLA_assert_item_size_matches(VLA* v, size_t item_size) {
 }
 
 size_t VLA_normalize_index(VLA* v, signed long idx) {
-    if (idx < 0)
-        return v->length / v->item_size + idx;
-    else
-        return idx;
+    if (idx >= 0) return idx;
+    return v->length / v->item_size + idx;
 }
 
-// Vergrößert die capacity des VLA um factor.
+// Vergrößert die Kapazität des VLA um factor.
 void VLA_expand(VLA* v, double factor) {
-    // ceil() wird benutzt, damit man bei 1.x Faktoren über die 1er-capacity hinauskommt
+    // Der Wert wird hochgerundet, damit man bei 1.x Faktoren über die 1er-capacity hinauskommt
     v->capacity = (size_t)ceil(v->capacity * factor);
     v->data = realloc(v->data, v->capacity);
     if (v->data == NULL) {
@@ -61,7 +64,10 @@ void VLA_expand(VLA* v, double factor) {
 // Fügt beliebig viele Items ans Ende des VLA hinzu und vergrößert ihn vorher, wenn nötig.
 void VLA_append(VLA* v, void* address, size_t amount) {
     if (v->length + amount * v->item_size >= v->capacity) {
-        // 1.5 statt 2, weil es vor allem für viele Items weniger Memory verbraucht und trotzdem genauso gut funktioniert
+        // 1.5 statt 2, weil es vor allem für viele Items weniger Memory verbraucht und trotzdem genauso gut funktioniert.
+        // Der andere Teil der Formel sorgt dafür, dass bei großen Einfügungen der Faktor automatisch mitwächst.
+        // TODO: Eine alternative Herangehensweise wäre es, immer den letzten Faktor abzuspeichern, und dann mit
+        // dem aktuellen Faktor den Durchschnitt zu bilden. Diese Methode ist vielleicht noch präzieser als die aktuelle.
         VLA_expand(v, (double)(v->length + amount * v->item_size) / (double)v->capacity * 1.5);
     }
 
@@ -77,7 +83,7 @@ void VLA_replace_at_index(VLA* v, void* address, signed long idx) {
 }
 
 // Löscht das idx'te Item, indem das letzte Item dorthin kopiert und die Länge um v->item_size verringert wird.
-// Diese Methode erhält nicht die Reihenfolge der Items, pass also auf, dass das im aufrufenden Code nicht wichtig ist.
+// Diese Methode erhält nicht die Reihenfolge der Items, in diesem Fall sollte VLA_delete_at_index_order_safe() benutzt werden.
 void VLA_delete_at_index(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
@@ -99,11 +105,17 @@ void VLA_delete_at_index_order_safe(VLA* v, signed long idx) {
     v->length -= v->item_size;
 }
 
+// FIXME: return-Typ zu uint8_t* ändern, es gibt keinen Grund warum
+// das ein void* sein sollte
 void* VLA_get(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
 
     return (void*)(v->data + idx * v->item_size);
+}
+
+size_t VLA_get_length(VLA* v) {
+    return v->length / v->item_size;
 }
 
 void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
@@ -140,20 +152,24 @@ void VLA_print_dump_data(VLA* v, VLA* formatter) {
 }
 
 void VLA_print(VLA* v) {
+#ifdef DEBUG
     if (v->item_formatter == NULL) {
         warn("Item formatter is not set for this VLA, returning.\n");
         return;
     }
 
-    VLA* output = VLA_initialize(v->length / v->item_size * 3, sizeof(char));  // Rekursion!
+    VLA* output = VLA_initialize(v->length / v->item_size * 3 + INFO_HEADER_SIZE, sizeof(char));  // Rekursion!
     VLA_print_setup_information_header(v, output);
     VLA_print_dump_data(v, output);
+    VLA_append(output, &(char){'\0'}, 1);
 
     debug("%s\n", (char*)output->data);
     VLA_free(output);
+#endif
 }
 
-// Löscht den VLA selbst und optional auch den data-Array
+// Löscht den VLA selbst und optional auch den data-Array, falls.
+// data_freeing_policy auf freeable gesetzt ist.
 void VLA_free(VLA* v) {
     if (v->data_freeing_policy == freeable) free(v->data);
     free(v);
