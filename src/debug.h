@@ -12,7 +12,7 @@ static char* warn_color = "\033[33;1m";
 static char* panic_color = "\033[31;1m";
 static char* reset_color = "\033[0m";
 
-#define STACK_FRAME_SIZE 3
+#define STACK_FRAME_SIZE 10
 #define FORMAT_MAXLEN 512
 
 static inline void debug(char* format, ...) {
@@ -38,7 +38,7 @@ static inline void warn(char* format, ...) {
     char internal_format[FORMAT_MAXLEN];
     va_list args;
     va_start(args, format);
-    snprintf(internal_format, FORMAT_MAXLEN, "%s[WARNING]%s %s", warn_color, reset_color, format);
+    snprintf(internal_format, FORMAT_MAXLEN, "%s[!]%s %s", warn_color, reset_color, format);
     vfprintf(stderr, internal_format, args);
     va_end(args);
     free(symbols);
