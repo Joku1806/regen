@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "debug.h"
 #include "parser.h"
 
 bool grammar_blocklist[TOKEN_COUNT][TOKEN_COUNT] = {
@@ -113,7 +114,7 @@ ParserState *parse_regex(char *regex) {
     }
 
     VLA_print(token_history);
-    debug("Cleaned: %s\n", state->regex);
+    debug("Cleaned regex: %s\n", state->regex);
 
     state->tokens = (Token *)token_history->data;
     VLA_free(token_history);
