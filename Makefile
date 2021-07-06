@@ -11,7 +11,7 @@ BIN=$(BINDIR)/regen
 
 all: $(BIN)
 
-debug: CFLAGS=-Wall -g -rdynamic -O0 -DDEBUG
+debug: CFLAGS=-Wall -g -rdynamic -O0 -DDEBUG -fsanitize=address
 debug: clean
 debug: $(BIN)
 
