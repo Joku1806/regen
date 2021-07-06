@@ -41,9 +41,6 @@ ParserState* construct_parser_state();
 // escape_active wird gebraucht, damit alles nach escape als character interpretiert wird.
 Token get_token_type(char token, bool escape_active);
 char* get_token_description(Token token);
-// Schreibt den geparsten Regex und Token-Array in Postfix-Notation um,
-// um die Erstellung des NFA einfacher zu machen
-void postfixify(ParserState* state);
 // Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist (semantisch ist nochmal ne Ecke schwerer)
 ParserState* parse_regex(char* regex);
 
