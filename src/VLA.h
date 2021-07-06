@@ -30,7 +30,7 @@ void VLA_append(VLA* v, void* address, size_t amount);
 void VLA_replace_at_index(VLA* v, void* address, signed long idx);
 void VLA_delete_at_index(VLA* v, signed long idx);
 void VLA_delete_at_index_order_safe(VLA* v, signed long idx);
-void* VLA_get(VLA* v, signed long idx);
+uint8_t* VLA_get(VLA* v, signed long idx);
 size_t VLA_get_length(VLA* v);
 void VLA_print(VLA* v);
 void VLA_free(VLA* v);

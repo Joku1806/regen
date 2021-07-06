@@ -19,7 +19,7 @@ VLA* VLA_initialize(size_t capacity, size_t item_size) {
     v->capacity = capacity * item_size;
     v->length = 0;
     v->item_size = item_size;
-    v->data = malloc(capacity * item_size);
+    v->data = calloc(capacity, item_size);
     v->data_freeing_policy = freeable;
     v->item_formatter = NULL;
 
@@ -51,23 +51,27 @@ size_t VLA_normalize_index(VLA* v, signed long idx) {
     return v->length / v->item_size + idx;
 }
 
-// Vergrößert die Kapazität des VLA um factor.
-void VLA_expand(VLA* v, double factor) {
-    // Der Wert wird hochgerundet, damit man bei 1.x Faktoren über die 1er-capacity hinauskommt
-    v->capacity = (size_t)ceil(v->capacity * factor);
-    v->data = realloc(v->data, v->capacity);
+void VLA_resize(VLA* v, size_t size) {
+    v->capacity = size;
+    v->data = realloc(v->data, size);
     if (v->data == NULL) {
         panic("%s\n", strerror(errno));
     }
 }
 
+// Vergrößert die Kapazität des VLA um factor.
+void VLA_expand(VLA* v, double factor) {
+    // Der Wert wird hochgerundet, damit man bei 1.x Faktoren über die 1er-capacity hinauskommt
+    VLA_resize(v, (size_t)ceil(v->capacity * factor));
+}
+
 // Fügt beliebig viele Items ans Ende des VLA hinzu und vergrößert ihn vorher, wenn nötig.
 void VLA_append(VLA* v, void* address, size_t amount) {
     if (v->length + amount * v->item_size >= v->capacity) {
-        // 1.5 statt 2, weil es vor allem für viele Items weniger Memory verbraucht und trotzdem genauso gut funktioniert.
+        // 1.5 statt 2, weil es vor allem für viele Items weniger Speicher verbraucht und trotzdem genauso gut funktioniert.
         // Der andere Teil der Formel sorgt dafür, dass bei großen Einfügungen der Faktor automatisch mitwächst.
         // TODO: Eine alternative Herangehensweise wäre es, immer den letzten Faktor abzuspeichern, und dann mit
-        // dem aktuellen Faktor den Durchschnitt zu bilden. Diese Methode ist vielleicht noch präzieser als die aktuelle.
+        // dem aktuellen Faktor den Durchschnitt zu bilden. Diese Methode ist vielleicht noch präziser als die aktuelle.
         VLA_expand(v, (double)(v->length + amount * v->item_size) / (double)v->capacity * 1.5);
     }
 
@@ -105,13 +109,11 @@ void VLA_delete_at_index_order_safe(VLA* v, signed long idx) {
     v->length -= v->item_size;
 }
 
-// FIXME: return-Typ zu uint8_t* ändern, es gibt keinen Grund warum
-// das ein void* sein sollte
-void* VLA_get(VLA* v, signed long idx) {
+uint8_t* VLA_get(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
 
-    return (void*)(v->data + idx * v->item_size);
+    return v->data + idx * v->item_size;
 }
 
 size_t VLA_get_length(VLA* v) {
