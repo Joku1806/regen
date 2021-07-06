@@ -29,6 +29,6 @@ void close_current_block_level(GeneratorState *state);
 
 // API-Methoden
 NFA *generate_NFA_from_parsed_regex(ParserState *parsed);
-NFA *optimize_NFA_layout(NFA *NFA);
+Compact_NFA *compact_generated_NFA(NFA *NFA);
 
 #endif
