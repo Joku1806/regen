@@ -65,8 +65,13 @@ void VLA_expand(VLA* v, double factor) {
     VLA_resize(v, (size_t)ceil(v->capacity * factor));
 }
 
+// Fügt den an der Adresse gespeicherten Wert ans Ende des VLA hinzu und vergrößert ihn vorher, wenn nötig.
+void VLA_append(VLA* v, void* address) {
+    VLA_batch_append(v, address, 1);
+}
+
 // Fügt beliebig viele Items ans Ende des VLA hinzu und vergrößert ihn vorher, wenn nötig.
-void VLA_append(VLA* v, void* address, size_t amount) {
+void VLA_batch_append(VLA* v, void* address, size_t amount) {
     if (v->length + amount * v->item_size >= v->capacity) {
         // 1.5 statt 2, weil es vor allem für viele Items weniger Speicher verbraucht und trotzdem genauso gut funktioniert.
         // Der andere Teil der Formel sorgt dafür, dass bei großen Einfügungen der Faktor automatisch mitwächst.
@@ -96,6 +101,7 @@ void VLA_delete_at_index(VLA* v, signed long idx) {
     v->length -= v->item_size;
 }
 
+// FIXME: Wird diese Methode wirklich irgendwo gebraucht?
 // Löscht das idx'te Item, indem alle Items nach idx eine Stelle nach links verschoben werden.
 // Diese Methode erhält die Reihenfolge der Elemente, sollte aber nicht für große VLA's benutzt werden,
 // da sonst sehr viele Einträge kopiert werden müssten.
@@ -109,6 +115,11 @@ void VLA_delete_at_index_order_safe(VLA* v, signed long idx) {
     v->length -= v->item_size;
 }
 
+void VLA_clear(VLA* v) {
+    if (v == NULL) return;
+    v->length = 0;
+}
+
 uint8_t* VLA_get(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
@@ -117,7 +128,16 @@ uint8_t* VLA_get(VLA* v, signed long idx) {
 }
 
 size_t VLA_get_length(VLA* v) {
+    if (v == NULL) return 0;
     return v->length / v->item_size;
+}
+
+void VLA_address_formatter(VLA* formatter, void* item) {
+    unsigned long address = *(unsigned long*)item;
+    const int n = snprintf(NULL, 0, "%p", (void*)address);
+    char buffer[n + 1];
+    snprintf(buffer, n + 1, "%p", (void*)address);
+    VLA_batch_append(formatter, &buffer, n);
 }
 
 void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
@@ -125,31 +145,31 @@ void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
     const int n = snprintf(NULL, 0, "%zu", SIZE_MAX);
     char buffer[n + 1];
 
-    VLA_append(formatter, "VLA with Item size: ", 20);
+    VLA_batch_append(formatter, "VLA with Item size: ", 20);
     chars_written = snprintf(buffer, n + 1, "%zu", v->item_size);
-    VLA_append(formatter, buffer, chars_written);
-    VLA_append(formatter, " Bytes -- Space used: ", 22);
+    VLA_batch_append(formatter, buffer, chars_written);
+    VLA_batch_append(formatter, " Bytes -- Space used: ", 22);
     chars_written = snprintf(buffer, n + 1, "%zu", v->length);
-    VLA_append(formatter, buffer, chars_written);
-    VLA_append(formatter, "/", 1);
+    VLA_batch_append(formatter, buffer, chars_written);
+    VLA_batch_append(formatter, "/", 1);
     chars_written = snprintf(buffer, n + 1, "%zu", v->capacity);
-    VLA_append(formatter, buffer, chars_written);
-    VLA_append(formatter, " Bytes (", 8);
+    VLA_batch_append(formatter, buffer, chars_written);
+    VLA_batch_append(formatter, " Bytes (", 8);
 
     if (v->data_freeing_policy == freeable) {
-        VLA_append(formatter, "freeable", 8);
+        VLA_batch_append(formatter, "freeable", 8);
     } else {
-        VLA_append(formatter, "immutable", 9);
+        VLA_batch_append(formatter, "immutable", 9);
     }
 
-    VLA_append(formatter, ") ", 2);
+    VLA_batch_append(formatter, ") ", 2);
 }
 
 void VLA_print_dump_data(VLA* v, VLA* formatter) {
-    if (v->length > 0) VLA_append(formatter, "| ", 2);
+    if (v->length > 0) VLA_batch_append(formatter, "| ", 2);
     for (size_t offset = 0; offset < v->length; offset += v->item_size) {
         v->item_formatter(formatter, v->data + offset);
-        VLA_append(formatter, " | ", 3);
+        VLA_batch_append(formatter, " | ", 3);
     }
 }
 
@@ -163,7 +183,7 @@ void VLA_print(VLA* v) {
     VLA* output = VLA_initialize(v->length / v->item_size * 3 + INFO_HEADER_SIZE, sizeof(char));  // Rekursion!
     VLA_print_setup_information_header(v, output);
     VLA_print_dump_data(v, output);
-    VLA_append(output, &(char){'\0'}, 1);
+    VLA_append(output, &(char){'\0'});
 
     debug("%s\n", (char*)output->data);
     VLA_free(output);

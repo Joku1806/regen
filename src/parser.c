@@ -69,7 +69,7 @@ Token VLA_binding_get_Token(VLA *v, signed long idx) {
 void Token_formatter(VLA *formatter, void *item) {
     Token casted = *(Token *)item;
     char *description = get_token_description(casted);
-    VLA_append(formatter, description, strlen(description));
+    VLA_batch_append(formatter, description, strlen(description));
 }
 
 ParserState *parse_regex(char *regex) {
@@ -102,7 +102,7 @@ ParserState *parse_regex(char *regex) {
         if (current != mod_escape && current != whitespace) {
             size_t char_index = token_history->length / token_history->item_size;
             state->regex[char_index] = regex[idx];
-            VLA_append(token_history, &current, 1);
+            VLA_append(token_history, &current);
         }
     }
 

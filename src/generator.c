@@ -46,7 +46,7 @@ void size_t_formatter(VLA *formatter, void *item) {
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted);
 
-    VLA_append(formatter, &buffer, n);
+    VLA_batch_append(formatter, &buffer, n);
 }
 
 void increment_current_group_counter(VLA *levels) {

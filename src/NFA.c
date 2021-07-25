@@ -74,7 +74,7 @@ void NFA_add_connection_between(Node *from, Node *to, char *matching) {
 
     debug("Now adding connection from z%u to z%u matching %s.\n", from->id, to->id, matching);
     Edge *connection = construct_NFA_Edge(matching, to);
-    VLA_append(from->NFA_Edges, connection, 1);
+    VLA_append(from->NFA_Edges, connection);
 }
 
 void NFA_add_empty_connection_between(Node *from, Node *to) {
@@ -94,24 +94,24 @@ Node *VLA_binding_get_NFA_Node_Pointer(VLA *v, signed long idx) {
 
 void NFA_Node_formatter(VLA *formatter, void *item) {
     Node *casted = (Node *)item;
-    VLA_append(formatter, "z", 1);
+    VLA_append(formatter, "z");
 
     const int n = snprintf(NULL, 0, "%zu", casted->id);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted->id);
 
-    VLA_append(formatter, &buffer, n);
+    VLA_batch_append(formatter, &buffer, n);
 }
 
 void NFA_Node_Pointer_formatter(VLA *formatter, void *item) {
     Node *casted = *(Node **)item;
-    VLA_append(formatter, "z", 1);
+    VLA_append(formatter, "z");
 
     const int n = snprintf(NULL, 0, "%zu", casted->id);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted->id);
 
-    VLA_append(formatter, &buffer, n);
+    VLA_batch_append(formatter, &buffer, n);
 }
 
 Edge *VLA_binding_get_NFA_Edge(VLA *v, signed long idx) {
