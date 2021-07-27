@@ -20,18 +20,8 @@ VLA* VLA_initialize(size_t capacity, size_t item_size) {
     v->length = 0;
     v->item_size = item_size;
     v->data = calloc(capacity, item_size);
-    v->data_freeing_policy = freeable;
-    v->item_formatter = NULL;
 
     return v;
-}
-
-void VLA_set_item_formatter(VLA* v, void (*item_formatter)(VLA* formatter, void* item)) {
-    v->item_formatter = item_formatter;
-}
-
-void VLA_set_data_freeing_policy(VLA* v, data_policy policy) {
-    v->data_freeing_policy = policy;
 }
 
 void VLA_assert_in_bounds(VLA* v, size_t idx) {
@@ -92,26 +82,12 @@ void VLA_replace_at_index(VLA* v, void* address, signed long idx) {
 }
 
 // Löscht das idx'te Item, indem das letzte Item dorthin kopiert und die Länge um v->item_size verringert wird.
-// Diese Methode erhält nicht die Reihenfolge der Items, in diesem Fall sollte VLA_delete_at_index_order_safe() benutzt werden.
+// Diese Methode erhält nicht die Reihenfolge der Items.
 void VLA_delete_at_index(VLA* v, signed long idx) {
     idx = VLA_normalize_index(v, idx);
     VLA_assert_in_bounds(v, idx);
 
     memcpy(v->data + idx * v->item_size, v->data + v->length - v->item_size, v->item_size);
-    v->length -= v->item_size;
-}
-
-// FIXME: Wird diese Methode wirklich irgendwo gebraucht?
-// Löscht das idx'te Item, indem alle Items nach idx eine Stelle nach links verschoben werden.
-// Diese Methode erhält die Reihenfolge der Elemente, sollte aber nicht für große VLA's benutzt werden,
-// da sonst sehr viele Einträge kopiert werden müssten.
-void VLA_delete_at_index_order_safe(VLA* v, signed long idx) {
-    idx = VLA_normalize_index(v, idx);
-    VLA_assert_in_bounds(v, idx);
-
-    for (size_t i = idx; i < v->length / v->item_size - 1; i++) {
-        v->data[i] = v->data[i + 1];
-    }
     v->length -= v->item_size;
 }
 
@@ -132,12 +108,12 @@ size_t VLA_get_length(VLA* v) {
     return v->length / v->item_size;
 }
 
-void VLA_address_formatter(VLA* formatter, void* item) {
+void VLA_address_formatter(VLA* output, void* item) {
     unsigned long address = *(unsigned long*)item;
     const int n = snprintf(NULL, 0, "%p", (void*)address);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%p", (void*)address);
-    VLA_batch_append(formatter, &buffer, n);
+    VLA_batch_append(output, &buffer, n);
 }
 
 void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
@@ -154,35 +130,27 @@ void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
     VLA_batch_append(formatter, "/", 1);
     chars_written = snprintf(buffer, n + 1, "%zu", v->capacity);
     VLA_batch_append(formatter, buffer, chars_written);
-    VLA_batch_append(formatter, " Bytes (", 8);
-
-    if (v->data_freeing_policy == freeable) {
-        VLA_batch_append(formatter, "freeable", 8);
-    } else {
-        VLA_batch_append(formatter, "immutable", 9);
-    }
-
-    VLA_batch_append(formatter, ") ", 2);
+    VLA_batch_append(formatter, " Bytes", 6);
 }
 
-void VLA_print_dump_data(VLA* v, VLA* formatter) {
-    if (v->length > 0) VLA_batch_append(formatter, "| ", 2);
+void VLA_print_dump_data(VLA* v, VLA* output, void (*item_formatter)(VLA* formatter, void* item)) {
+    if (v->length > 0) VLA_batch_append(output, "| ", 2);
     for (size_t offset = 0; offset < v->length; offset += v->item_size) {
-        v->item_formatter(formatter, v->data + offset);
-        VLA_batch_append(formatter, " | ", 3);
+        item_formatter(output, v->data + offset);
+        VLA_batch_append(output, " | ", 3);
     }
 }
 
-void VLA_print(VLA* v) {
+void VLA_print(VLA* v, void (*item_formatter)(VLA* output, void* item)) {
 #ifdef DEBUG
-    if (v->item_formatter == NULL) {
-        warn("Item formatter is not set for this VLA, returning.\n");
+    if (item_formatter == NULL) {
+        warn("Please pass an item formatter for interpreting the data saved in the VLA.\n");
         return;
     }
 
     VLA* output = VLA_initialize(v->length / v->item_size * 3 + INFO_HEADER_SIZE, sizeof(char));  // Rekursion!
     VLA_print_setup_information_header(v, output);
-    VLA_print_dump_data(v, output);
+    VLA_print_dump_data(v, output, item_formatter);
     VLA_append(output, &(char){'\0'});
 
     debug("%s\n", (char*)output->data);
@@ -190,9 +158,15 @@ void VLA_print(VLA* v) {
 #endif
 }
 
-// Löscht den VLA selbst und optional auch den data-Array, falls.
-// data_freeing_policy auf freeable gesetzt ist.
+// Löscht den VLA und seine gespeicherten Daten
 void VLA_free(VLA* v) {
-    if (v->data_freeing_policy == freeable) free(v->data);
+    free(v->data);
     free(v);
+}
+
+// Löscht den VLA und gibt die gespeicherten Daten zurück
+uint8_t* VLA_extract(VLA* v) {
+    uint8_t* data = v->data;
+    free(v);
+    return data;
 }
