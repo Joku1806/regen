@@ -65,7 +65,6 @@ void remove_unused_cycle_guard(VLA* guard, size_t entry) {
 Match_Container* match(char* to_match, Compact_NFA* match_with) {
     Stack* paths = stack_initialize(5, sizeof(PartialMatch*));
     VLA* matches = VLA_initialize(5, sizeof(Match));
-    VLA_set_data_freeing_policy(matches, immutable);
     VLA** cycle_guards = setup_cycle_guards(match_with);
 
     for (size_t match_offset = 0; match_offset < strlen(to_match); match_offset++) {
@@ -76,9 +75,6 @@ Match_Container* match(char* to_match, Compact_NFA* match_with) {
 
         while (VLA_get_length(paths) > 0) {
             PartialMatch* current = *(PartialMatch**)stack_pop(paths);
-            if (current->match_length == 3) {
-                debug("Got %.*s as partial match\n", current->match_length, to_match + match_offset);
-            }
 
             if (current->node_idx == match_with->stop_node_index) {
                 Match match = {
@@ -88,7 +84,7 @@ Match_Container* match(char* to_match, Compact_NFA* match_with) {
                 VLA_append(matches, &match);
             }
 
-            if (match_offset + current->match_length >= strlen(to_match)) continue;
+            if (match_offset + current->match_length > strlen(to_match)) continue;
             char* position = to_match + match_offset + current->match_length;
             Compact_Edge* possible_connections = match_with->nodes[current->node_idx].outgoing_edges;
             for (size_t edge_idx = 0; edge_idx < match_with->nodes[current->node_idx].number_of_outgoing_edges; edge_idx++) {
@@ -105,16 +101,13 @@ Match_Container* match(char* to_match, Compact_NFA* match_with) {
         clear_cycle_guards(cycle_guards, match_with->number_of_nodes);
     }
 
-    Match_Container* container = into_match_container(matches);
     VLA_free(paths);
-    VLA_free(matches);
-
     for (size_t delete_index = 0; delete_index < match_with->number_of_nodes; delete_index++) {
         if (cycle_guards[delete_index] == NULL) continue;
         VLA_free(cycle_guards[delete_index]);
     }
 
-    return container;
+    return into_match_container(matches);
 }
 
 bool edge_matches_current_position(Compact_Edge* edge, char* position) {
@@ -135,7 +128,7 @@ bool would_enter_infinite_loop(VLA** cycle_guards, PartialMatch* state, Compact_
 
 Match_Container* into_match_container(VLA* matches) {
     Match_Container* container = calloc(1, sizeof(Match_Container));
-    container->matches = (Match*)matches->data;
     container->number_of_matches = VLA_get_length(matches);
+    container->matches = (Match*)VLA_extract(matches);
     return container;
 }
