@@ -92,26 +92,26 @@ Node *VLA_binding_get_NFA_Node_Pointer(VLA *v, signed long idx) {
     return *(Node **)VLA_get(v, idx);
 }
 
-void NFA_Node_formatter(VLA *formatter, void *item) {
+void NFA_Node_formatter(VLA *output, void *item) {
     Node *casted = (Node *)item;
-    VLA_append(formatter, "z");
+    VLA_append(output, "z");
 
     const int n = snprintf(NULL, 0, "%zu", casted->id);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted->id);
 
-    VLA_batch_append(formatter, &buffer, n);
+    VLA_batch_append(output, &buffer, n);
 }
 
-void NFA_Node_Pointer_formatter(VLA *formatter, void *item) {
+void NFA_Node_Pointer_formatter(VLA *output, void *item) {
     Node *casted = *(Node **)item;
-    VLA_append(formatter, "z");
+    VLA_append(output, "z");
 
     const int n = snprintf(NULL, 0, "%zu", casted->id);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted->id);
 
-    VLA_batch_append(formatter, &buffer, n);
+    VLA_batch_append(output, &buffer, n);
 }
 
 Edge *VLA_binding_get_NFA_Edge(VLA *v, signed long idx) {

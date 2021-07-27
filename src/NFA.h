@@ -44,8 +44,8 @@ struct Compact_NFA {
     size_t stop_node_index;
 };
 
-void NFA_Node_formatter(VLA *formatter, void *item);
-void NFA_Node_Pointer_formatter(VLA *formatter, void *item);
+void NFA_Node_formatter(VLA *output, void *item);
+void NFA_Node_Pointer_formatter(VLA *output, void *item);
 Node *VLA_binding_get_NFA_Node(VLA *v, signed long idx);
 Node *VLA_binding_get_NFA_Node_Pointer(VLA *v, signed long idx);
 Edge *VLA_binding_get_NFA_Edge(VLA *v, signed long idx);

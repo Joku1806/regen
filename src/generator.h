@@ -15,7 +15,7 @@ typedef struct GeneratorState {
 
 // Interne Methoden
 size_t VLA_binding_get_size_t(VLA *v, signed long idx);
-void size_t_formatter(VLA *formatter, void *item);
+void size_t_formatter(VLA *output, void *item);
 GeneratorState *construct_GeneratorState();
 void destruct_GeneratorState(GeneratorState *state);
 void increment_current_group_counter(VLA *levels);

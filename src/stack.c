@@ -11,12 +11,12 @@ void stack_pop_n(Stack* s, size_t amount) {
     }
 
     for (size_t counter = 0; counter < amount; counter++) {
-        VLA_delete_at_index_order_safe(s, -1);
+        VLA_delete_at_index(s, -1);
     }
 }
 
 uint8_t* stack_pop(Stack* s) {
     uint8_t* item = VLA_get(s, -1);
-    VLA_delete_at_index_order_safe(s, -1);
+    VLA_delete_at_index(s, -1);
     return item;
 }

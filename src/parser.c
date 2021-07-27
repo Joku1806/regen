@@ -66,17 +66,15 @@ Token VLA_binding_get_Token(VLA *v, signed long idx) {
     return *(Token *)VLA_get(v, idx);
 }
 
-void Token_formatter(VLA *formatter, void *item) {
+void Token_formatter(VLA *output, void *item) {
     Token casted = *(Token *)item;
     char *description = get_token_description(casted);
-    VLA_batch_append(formatter, description, strlen(description));
+    VLA_batch_append(output, description, strlen(description));
 }
 
 ParserState *parse_regex(char *regex) {
     ParserState *state = construct_parser_state(regex);
     VLA *token_history = VLA_initialize(strlen(regex), sizeof(Token));
-    VLA_set_data_freeing_policy(token_history, immutable);
-    VLA_set_item_formatter(token_history, Token_formatter);
 
     // Dummy-Element, damit man direkt am Anfang auf grammar_table zugreifen kann.
     // block_open, weil es Anfang genau einen globalen Block gibt und die Regeln dafür komplett gleich sind.
@@ -113,10 +111,9 @@ ParserState *parse_regex(char *regex) {
         return state;
     }
 
-    VLA_print(token_history);
+    VLA_print(token_history, Token_formatter);
     debug("Cleaned regex: %s\n", state->regex);
 
-    state->tokens = (Token *)token_history->data;
-    VLA_free(token_history);
+    state->tokens = (Token *)VLA_extract(token_history);
     return state;
 }

@@ -10,11 +10,6 @@ GeneratorState *construct_GeneratorState() {
     new->group_counters = stack_initialize(2, sizeof(size_t));
     new->global_node_index = calloc(1, sizeof(size_t));
     new->generated = construct_NFA();
-
-    VLA_set_item_formatter(new->start_nodes, NFA_Node_Pointer_formatter);
-    VLA_set_item_formatter(new->stop_nodes, NFA_Node_Pointer_formatter);
-    VLA_set_item_formatter(new->group_counters, size_t_formatter);
-
     new->generated->start = construct_NFA_Node(new->global_node_index);
     new->generated->stop = construct_NFA_Node(new->global_node_index);
 
@@ -40,13 +35,13 @@ size_t VLA_binding_get_size_t(VLA *v, signed long idx) {
     return *(size_t *)VLA_get(v, idx);
 }
 
-void size_t_formatter(VLA *formatter, void *item) {
+void size_t_formatter(VLA *output, void *item) {
     size_t casted = *(size_t *)item;
     const int n = snprintf(NULL, 0, "%zu", casted);
     char buffer[n + 1];
     snprintf(buffer, n + 1, "%zu", casted);
 
-    VLA_batch_append(formatter, &buffer, n);
+    VLA_batch_append(output, &buffer, n);
 }
 
 void increment_current_group_counter(VLA *levels) {
@@ -160,8 +155,6 @@ NFA *generate_NFA_from_parsed_regex(ParserState *parsed) {
     NFA *generated = state->generated;
     generated->number_of_nodes = *state->global_node_index;
     destruct_GeneratorState(state);
-
-    // Kein hängender Pointer, weil die data policy auf immutable gesetzt ist
     return generated;
 }
 
@@ -169,11 +162,10 @@ Compact_NFA *compact_generated_NFA(NFA *NFA) {
     Node **lookup = calloc(NFA->number_of_nodes, sizeof(Node *));
     Compact_NFA *cNFA = construct_Compact_NFA(NFA->number_of_nodes);
     Stack *visitor_order = stack_initialize(NFA->number_of_nodes, sizeof(Node *));
-    VLA_set_item_formatter(visitor_order, NFA_Node_Pointer_formatter);
     stack_push(visitor_order, &(NFA->start));
 
     while (VLA_get_length(visitor_order) > 0) {
-        VLA_print(visitor_order);
+        VLA_print(visitor_order, NFA_Node_Pointer_formatter);
         Node *visiting = *(Node **)stack_pop(visitor_order);
         debug("Node at %p with id=%lu, and %lu edges.\n", visiting, visiting->id, VLA_get_length(visiting->NFA_Edges));
         lookup[visiting->id] = visiting;
