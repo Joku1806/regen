@@ -22,7 +22,7 @@ typedef enum {
 typedef struct {
     Token* tokens;
     char* regex;
-    int open_blocks;
+    size_t open_blocks;
     bool escape_active;
     bool invalid;
 } ParserState;
@@ -33,7 +33,8 @@ typedef struct {
 // erlaubt sein sollen, müssen auf true gesetzt werden.
 extern bool grammar_blocklist[TOKEN_COUNT][TOKEN_COUNT];
 
-ParserState* construct_parser_state();
+ParserState* initialize_parser_state();
+void free_parser_state(ParserState* state);
 // Definiert ein Mapping von Buchstaben auf die einzelnen Token-Typen.
 // Sollte man also den von mir gewählten Regex-Dialekt umändern wollen,
 // dann muss man einfach nur die Vergleiche in dieser Funktion umschreiben,
@@ -41,7 +42,7 @@ ParserState* construct_parser_state();
 // escape_active wird gebraucht, damit alles nach escape als character interpretiert wird.
 Token get_token_type(char token, bool escape_active);
 char* get_token_description(Token token);
-// Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist (semantisch ist nochmal ne Ecke schwerer)
+// Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist.
 ParserState* parse_regex(char* regex);
 
 #endif

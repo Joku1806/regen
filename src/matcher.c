@@ -4,32 +4,24 @@
 #include "stack.h"
 #include "debug.h"
 
-PartialMatch* advance_current_PartialMatch(PartialMatch* current, Compact_Edge* connection) {
-    PartialMatch* next = calloc(1, sizeof(PartialMatch));
-    next->match_length = current->match_length + connection->match_length;
-    next->node_idx = connection->target_index;
-
-    return next;
-}
-
 VLA** setup_cycle_guards(Compact_NFA* nfa) {
-    VLA** cycle_guards = calloc(nfa->number_of_nodes, sizeof(VLA*));
-    bool* visited_nodes = calloc(nfa->number_of_nodes, sizeof(bool));
-    Stack* node_indices = stack_initialize(nfa->number_of_nodes, sizeof(size_t));
+    VLA** cycle_guards = calloc(nfa->node_count, sizeof(VLA*));
+    bool* visited_nodes = calloc(nfa->node_count, sizeof(bool));
+    Stack* node_indices = stack_initialize(nfa->node_count, sizeof(size_t));
     stack_push(node_indices, &nfa->start_node_index);
 
     while (VLA_get_length(node_indices) > 0) {
         size_t current_index = *(size_t*)stack_pop(node_indices);
-        Compact_Node current = nfa->nodes[current_index];
+        Compact_Node current_node = nfa->nodes[current_index];
         visited_nodes[current_index] = true;
 
-        for (size_t edge_index = 0; edge_index < current.number_of_outgoing_edges; edge_index++) {
-            Compact_Edge c_edge = current.outgoing_edges[edge_index];
-            if (c_edge.match_length > 0) continue;
-            if (visited_nodes[c_edge.target_index]) {
-                cycle_guards[c_edge.target_index] = VLA_initialize(1, sizeof(size_t));
+        for (size_t edge_index = 0; edge_index < current_node.edge_count; edge_index++) {
+            Compact_Edge current_edge = current_node.edges[edge_index];
+            if (current_edge.match_length > 0) continue;
+            if (visited_nodes[current_edge.endpoint]) {
+                cycle_guards[current_edge.endpoint] = VLA_initialize(1, sizeof(size_t));
             } else {
-                stack_push(node_indices, &c_edge.target_index);
+                stack_push(node_indices, &current_edge.endpoint);
             }
         }
     }
@@ -39,96 +31,84 @@ VLA** setup_cycle_guards(Compact_NFA* nfa) {
     return cycle_guards;
 }
 
-void clear_cycle_guards(VLA** guards, size_t number_of_guards) {
-    for (size_t idx = 0; idx < number_of_guards; idx++) {
-        if (guards[idx] == NULL) continue;
-        VLA_clear(guards[idx]);
+void clear_cycle_guards(VLA** guards, size_t guard_count) {
+    for (size_t index = 0; index < guard_count; index++) {
+        if (guards[index] == NULL) continue;
+        VLA_clear(guards[index]);
     }
 }
 
-void remove_unused_cycle_guard(VLA* guard, size_t entry) {
-    if (guard == NULL) {
-        warn("Cycle guard is NULL, check the caller for logic errors!\n");
-        return;
-    }
+bool would_enter_infinite_loop(VLA* cycle_guard, PartialMatch* match, Compact_Edge* edge) {
+    if (cycle_guard == NULL) return false;
+    if (edge->match_length > 0) return false;
 
-    for (size_t search_idx = 0; search_idx < VLA_get_length(guard); search_idx++) {
-        if (*(size_t*)VLA_get(guard, search_idx) == entry) {
-            VLA_delete_at_index(guard, search_idx);
-            return;
-        }
-    }
-
-    warn("Couldn't find entry %lu in guard with size=%lu", entry, VLA_get_length(guard));
-}
-
-Match_Container* match(char* to_match, Compact_NFA* match_with) {
-    Stack* paths = stack_initialize(5, sizeof(PartialMatch*));
-    VLA* matches = VLA_initialize(5, sizeof(Match));
-    VLA** cycle_guards = setup_cycle_guards(match_with);
-
-    for (size_t match_offset = 0; match_offset < strlen(to_match); match_offset++) {
-        PartialMatch* start = calloc(1, sizeof(PartialMatch));
-        start->match_length = 0;
-        start->node_idx = match_with->start_node_index;
-        stack_push(paths, &start);
-
-        while (VLA_get_length(paths) > 0) {
-            PartialMatch* current = *(PartialMatch**)stack_pop(paths);
-
-            if (current->node_idx == match_with->stop_node_index) {
-                Match match = {
-                    .offset = match_offset,
-                    .length = current->match_length,
-                };
-                VLA_append(matches, &match);
-            }
-
-            if (match_offset + current->match_length > strlen(to_match)) continue;
-            char* position = to_match + match_offset + current->match_length;
-            Compact_Edge* possible_connections = match_with->nodes[current->node_idx].outgoing_edges;
-            for (size_t edge_idx = 0; edge_idx < match_with->nodes[current->node_idx].number_of_outgoing_edges; edge_idx++) {
-                if (edge_matches_current_position(&possible_connections[edge_idx], position)) {
-                    if (would_enter_infinite_loop(cycle_guards, current, &possible_connections[edge_idx])) continue;
-                    PartialMatch* next = advance_current_PartialMatch(current, &possible_connections[edge_idx]);
-                    if (cycle_guards[next->node_idx] != NULL) VLA_append(cycle_guards[next->node_idx], &next->match_length);
-                    stack_push(paths, &next);
-                }
-            }
-            free(current);
-        }
-
-        clear_cycle_guards(cycle_guards, match_with->number_of_nodes);
-    }
-
-    VLA_free(paths);
-    for (size_t delete_index = 0; delete_index < match_with->number_of_nodes; delete_index++) {
-        if (cycle_guards[delete_index] == NULL) continue;
-        VLA_free(cycle_guards[delete_index]);
-    }
-
-    return into_match_container(matches);
-}
-
-bool edge_matches_current_position(Compact_Edge* edge, char* position) {
-    if (strlen(position) < edge->match_length) return false;
-    return !memcmp(edge->matching, position, edge->match_length);
-}
-
-bool would_enter_infinite_loop(VLA** cycle_guards, PartialMatch* state, Compact_Edge* connection) {
-    if (connection->match_length > 0) return false;
-    if (cycle_guards[connection->target_index] == NULL) return false;
-
-    for (size_t cycle_entry_index = 0; cycle_entry_index < VLA_get_length(cycle_guards[connection->target_index]); cycle_entry_index++) {
-        size_t cycle_entry = *(size_t*)VLA_get(cycle_guards[connection->target_index], cycle_entry_index);
-        if (state->match_length == cycle_entry) return true;
+    for (size_t cycle_entry_index = 0; cycle_entry_index < VLA_get_length(cycle_guard); cycle_entry_index++) {
+        size_t cycle_entry = *(size_t*)VLA_get(cycle_guard, cycle_entry_index);
+        if (match->length == cycle_entry) return true;
     }
     return false;
 }
 
-Match_Container* into_match_container(VLA* matches) {
-    Match_Container* container = calloc(1, sizeof(Match_Container));
-    container->number_of_matches = VLA_get_length(matches);
-    container->matches = (Match*)VLA_extract(matches);
-    return container;
+bool matches_edge(char* position, Compact_Edge* edge) {
+    if (strlen(position) < edge->match_length) return false;
+    return !memcmp(edge->matches, position, edge->match_length);
+}
+
+PartialMatch* take_matching_edge(PartialMatch* current_match, Compact_Edge* edge) {
+    PartialMatch* advanced = calloc(1, sizeof(PartialMatch));
+    advanced->length = current_match->length + edge->match_length;
+    advanced->node_index = edge->endpoint;
+
+    return advanced;
+}
+
+Match* match(char* to_match, Compact_NFA* match_with, size_t* matches_count) {
+    Stack* partial_matches = stack_initialize(5, sizeof(PartialMatch*));
+    VLA* matches = VLA_initialize(5, sizeof(Match));
+    VLA** cycle_guards = setup_cycle_guards(match_with);
+
+    for (size_t offset = 0; offset < strlen(to_match); offset++) {
+        PartialMatch* start = calloc(1, sizeof(PartialMatch));
+        start->length = 0;
+        start->node_index = match_with->start_node_index;
+        stack_push(partial_matches, &start);
+
+        while (VLA_get_length(partial_matches) > 0) {
+            PartialMatch* current_match = *(PartialMatch**)stack_pop(partial_matches);
+
+            if (current_match->node_index == match_with->stop_node_index) {
+                Match* match = (Match*)VLA_reserve_next_slots(matches, 1);
+                match->offset = offset;
+                match->length = current_match->length;
+            }
+
+            if (offset + current_match->length > strlen(to_match)) continue;
+            char* matching_position = to_match + offset + current_match->length;
+
+            for (size_t edge_index = 0; edge_index < match_with->nodes[current_match->node_index].edge_count; edge_index++) {
+                Compact_Edge* current_edge = &match_with->nodes[current_match->node_index].edges[edge_index];
+                if (matches_edge(matching_position, current_edge)) {
+                    VLA* responsible_guard = cycle_guards[current_edge->endpoint];
+                    if (would_enter_infinite_loop(responsible_guard, current_match, current_edge)) continue;
+                    PartialMatch* advanced_match = take_matching_edge(current_match, current_edge);
+                    if (cycle_guards[advanced_match->node_index] != NULL) VLA_append(cycle_guards[advanced_match->node_index], &advanced_match->length);
+                    stack_push(partial_matches, &advanced_match);
+                }
+            }
+            free(current_match);
+        }
+
+        clear_cycle_guards(cycle_guards, match_with->node_count);
+    }
+
+    VLA_free(partial_matches);
+    for (size_t delete_index = 0; delete_index < match_with->node_count; delete_index++) {
+        if (cycle_guards[delete_index] == NULL) continue;
+        VLA_free(cycle_guards[delete_index]);
+    }
+    free(cycle_guards);
+    free_compact_nfa(match_with);
+
+    *matches_count = VLA_get_length(matches);
+    return (Match*)VLA_extract(matches);
 }

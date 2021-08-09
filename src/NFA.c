@@ -3,96 +3,108 @@
 #include "NFA.h"
 #include "debug.h"
 
-Node *construct_NFA_Node(size_t *id) {
+Node *create_node(size_t *id) {
     Node *new = malloc(sizeof(Node));
-    new->NFA_Edges = VLA_initialize(1, sizeof(Edge));
+    new->edges = VLA_initialize(1, sizeof(Edge));
     new->id = *id;
-    // debug("Created NFA Node z%u\n", *id);
 
     *id += 1;
     return new;
 }
 
-void free_NFA_Node(Node *to_free) {
-    // TODO: Überlegen, was eigentlich mit den erstellten Objekten aus construct_NFA_Edge() passieren soll,
-    // nachdem sie in den VLA kopiert wurden. Einfach löschen?
-    // Alternativ könnte man auch einen Weg finden, die Objekte direkt im VLA zu instanziieren, dann müsste man
-    // nicht extra kopieren und dann löschen. Bin mir allerdings nicht sicher, wie praktisch/möglich das in C ist.
-    // Ist möglich! Siehe https://stackoverflow.com/questions/28465151/initialize-array-starting-from-specific-address-in-memory-c-programming
-    VLA_free(to_free->NFA_Edges);
+void free_node(Node *to_free) {
+    VLA_free(to_free->edges);
     free(to_free);
 }
 
-Edge *construct_NFA_Edge(char *matching, Node *to) {
-    Edge *new = malloc(sizeof(Edge));
-    new->matching = matching;
-    new->advance_to = to;
-    return new;
-}
-
-NFA *construct_NFA() {
+NFA *initialize_nfa() {
     NFA *new = malloc(sizeof(NFA));
     new->start = NULL;
     new->stop = NULL;
     return new;
 }
 
-Compact_NFA *construct_Compact_NFA(size_t number_of_nodes) {
+void free_nfa(NFA *nfa, Node **nodes) {
+    for (size_t index = 0; index < nfa->node_count; index++) {
+        free_node(nodes[index]);
+    }
+    free(nfa);
+}
+
+Compact_NFA *initialize_compact_nfa(size_t node_count) {
     Compact_NFA *new = malloc(sizeof(Compact_NFA));
-    new->nodes = calloc(number_of_nodes, sizeof(Compact_Node));
-    new->number_of_nodes = number_of_nodes;
+    new->nodes = calloc(node_count, sizeof(Compact_Node));
+    new->node_count = node_count;
     new->start_node_index = 0;
     new->stop_node_index = 1;
 
     return new;
 }
 
-Compact_Node generate_Compact_Node(Node *from) {
+void free_compact_nfa(Compact_NFA *compact_nfa) {
+    for (size_t node_index = 0; node_index < compact_nfa->node_count; node_index++) {
+        for (size_t edge_index = 0; edge_index < compact_nfa->nodes[node_index].edge_count; edge_index++) {
+            free(compact_nfa->nodes[node_index].edges[edge_index].matches);
+        }
+        free(compact_nfa->nodes[node_index].edges);
+    }
+
+    free(compact_nfa->nodes);
+    free(compact_nfa);
+}
+
+Compact_Node create_compact_node(Node *from) {
     Compact_Node new = {
-        .outgoing_edges = calloc(VLA_get_length(from->NFA_Edges), sizeof(Compact_Edge)),
-        .number_of_outgoing_edges = VLA_get_length(from->NFA_Edges),
+        .edges = calloc(VLA_get_length(from->edges), sizeof(Compact_Edge)),
+        .edge_count = VLA_get_length(from->edges),
     };
 
     return new;
 }
 
-Compact_Edge generate_Compact_Edge(Edge *from) {
+Compact_Edge create_compact_edge(Edge *from) {
     Compact_Edge new = {
-        .matching = (uint8_t *)from->matching,
+        .matches = (uint8_t *)from->matching,
         .match_length = strlen(from->matching),
-        .target_index = from->advance_to->id,
+        .endpoint = from->endpoint->id,
     };
 
     return new;
 }
 
-void NFA_add_connection_between(Node *from, Node *to, char *matching) {
+void add_edge_between(Node *from, Node *to, char *matching) {
     if (from == NULL || to == NULL) {
-        warn("At least one of the nodes (at %p and %p) is NULL. Can't connect them with a new edge.\n", from, to);
+        warn("Mindestens einer der Knoten (%p und %p) existiert nicht. Deswegen können sie mit keiner Kante verbunden werden.\n", from, to);
         return;
     }
 
-    debug("Now adding connection from z%u to z%u matching %s.\n", from->id, to->id, matching);
-    Edge *connection = construct_NFA_Edge(matching, to);
-    VLA_append(from->NFA_Edges, connection);
+    debug("Füge Kante zwischen z%u und z%u mit Match %s hinzu.\n", from->id, to->id, matching);
+    Edge *edge = (Edge *)VLA_reserve_next_slots(from->edges, 1);
+    edge->matching = matching;
+    edge->endpoint = to;
 }
 
-void NFA_add_empty_connection_between(Node *from, Node *to) {
+void add_empty_edge_between(Node *from, Node *to) {
     char *empty = calloc(1, sizeof(char));
-    NFA_add_connection_between(from, to, empty);
+    add_edge_between(from, to, empty);
 }
 
-Node *VLA_binding_get_NFA_Node(VLA *v, signed long idx) {
+Node *VLA_binding_get_node(VLA *v, signed long index) {
     VLA_assert_item_size_matches(v, sizeof(Node));
-    return (Node *)VLA_get(v, idx);
+    return (Node *)VLA_get(v, index);
 }
 
-Node *VLA_binding_get_NFA_Node_Pointer(VLA *v, signed long idx) {
+Node *VLA_binding_get_node_pointer(VLA *v, signed long index) {
     VLA_assert_item_size_matches(v, sizeof(Node *));
-    return *(Node **)VLA_get(v, idx);
+    return *(Node **)VLA_get(v, index);
 }
 
-void NFA_Node_formatter(VLA *output, void *item) {
+Edge *VLA_binding_get_edge(VLA *v, signed long index) {
+    VLA_assert_item_size_matches(v, sizeof(Edge));
+    return (Edge *)VLA_get(v, index);
+}
+
+void node_formatter(VLA *output, void *item) {
     Node *casted = (Node *)item;
     VLA_append(output, "z");
 
@@ -103,7 +115,7 @@ void NFA_Node_formatter(VLA *output, void *item) {
     VLA_batch_append(output, &buffer, n);
 }
 
-void NFA_Node_Pointer_formatter(VLA *output, void *item) {
+void node_pointer_formatter(VLA *output, void *item) {
     Node *casted = *(Node **)item;
     VLA_append(output, "z");
 
@@ -112,17 +124,4 @@ void NFA_Node_Pointer_formatter(VLA *output, void *item) {
     snprintf(buffer, n + 1, "%zu", casted->id);
 
     VLA_batch_append(output, &buffer, n);
-}
-
-Edge *VLA_binding_get_NFA_Edge(VLA *v, signed long idx) {
-    VLA_assert_item_size_matches(v, sizeof(Edge));
-    return (Edge *)VLA_get(v, idx);
-}
-
-void NFA_free(NFA *NFA, Node **nodes) {
-    for (size_t idx = 0; idx < NFA->number_of_nodes; idx++) {
-        debug("Now trying to free node at %p (id=%ld (supposed) vs %ld (real)).\n", nodes[idx], idx, nodes[idx]->id);
-        free_NFA_Node(nodes[idx]);
-    }
-    free(NFA);
 }

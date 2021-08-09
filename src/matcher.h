@@ -1,30 +1,19 @@
 #include <stddef.h>
 #include "NFA.h"
 
-typedef struct Match Match;
-typedef struct PartialMatch PartialMatch;
-typedef struct Match_Container Match_Container;
+typedef struct {
+    size_t node_index;
+    size_t length;
+} PartialMatch;
 
-struct Match {
+typedef struct {
     size_t offset;
     size_t length;
-};
+} Match;
 
-struct PartialMatch {
-    size_t match_length;
-    size_t node_idx;
-};
-
-struct Match_Container {
-    Match* matches;
-    size_t number_of_matches;
-};
-
-PartialMatch* advance_current_PartialMatch(PartialMatch* current, Compact_Edge* connection);
 VLA** setup_cycle_guards(Compact_NFA* nfa);
-void remove_unused_cycle_guard(VLA* guard, size_t entry);
-bool edge_matches_current_position(Compact_Edge* edge, char* position);
-bool would_enter_infinite_loop(VLA** cycle_guards, PartialMatch* state, Compact_Edge* connection);
-void free_PartialMatch_branch(PartialMatch* starting_at);
-Match_Container* match(char* to_match, Compact_NFA* match_with);
-Match_Container* into_match_container(VLA* matches);
+void clear_cycle_guards(VLA** guards, size_t guard_count);
+bool would_enter_infinite_loop(VLA* cycle_guard, PartialMatch* match, Compact_Edge* edge);
+bool matches_edge(char* position, Compact_Edge* edge);
+PartialMatch* take_matching_edge(PartialMatch* current_match, Compact_Edge* edge);
+Match* match(char* to_match, Compact_NFA* match_with, size_t* matches_count);
