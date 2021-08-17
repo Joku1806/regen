@@ -51,7 +51,9 @@ Token get_token_type(char token, bool escape_active) {
     if (token == '+') return mod_multiple;
     if (token == '|') return mod_choice;
     if (token == '\\') return mod_escape;
-    if (token == ' ' || token == '\t' || token == '\n') return whitespace;
+    if (token == ' ' || token == '\a' || token == '\b' ||
+        token == '\t' || token == '\n' || token == '\v' ||
+        token == '\f' || token == '\r') return whitespace;
     return character;
 }
 
@@ -66,6 +68,39 @@ char *get_token_description(Token token) {
     if (token == whitespace) return "Whitespace";
     return "Character";
 }
+
+bool encodes_special_character(char c1, char c2) {
+    return c1 == '\\' && (c2 == '0' || c2 == 'a' || c2 == 'b' || c2 == 't' ||
+                          c2 == 'n' || c2 == 'v' || c2 == 'f' || c2 == 'r');
+}
+
+// FIXME: Compiler irgendwie erklären, dass das Ende der Funktion nie erreicht werden wird.
+// Im Moment muss diese hässliche Lösung herhalten
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
+char get_replacement_for_special_character(char special) {
+    switch (special) {
+        case '0':
+            return '\0';
+        case 'a':
+            return '\a';
+        case 'b':
+            return '\b';
+        case 't':
+            return '\t';
+        case 'n':
+            return '\n';
+        case 'v':
+            return '\v';
+        case 'f':
+            return '\f';
+        case 'r':
+            return '\r';
+        default:
+            panic("%c is not a supported special character!\n");
+    }
+}
+#pragma GCC diagnostic pop
 
 Token VLA_binding_get_token(VLA *v, signed long index) {
     VLA_assert_item_size_matches(v, sizeof(Token));
@@ -102,11 +137,13 @@ ParserState *parse_regex(char *regex) {
         else
             state->escape_active = false;
 
-        // Nur zu den Token hinzufügen wenn es syntaktisch wichtig ist
         if (current != mod_escape && current != whitespace) {
-            size_t char_index = token_history->length / token_history->item_size;
-            state->regex[char_index] = regex[index];
-            VLA_append(token_history, &current);
+            if (previous == character && current == character && encodes_special_character(regex[index - 1], regex[index])) {
+                state->regex[VLA_get_length(token_history) - 1] = get_replacement_for_special_character(regex[index]);
+            } else {
+                state->regex[VLA_get_length(token_history)] = regex[index];
+                VLA_append(token_history, &current);
+            }
         }
     }
 
