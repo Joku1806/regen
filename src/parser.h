@@ -13,16 +13,30 @@ typedef enum {
     mod_multiple = 4,
     mod_choice = 5,
     mod_escape = 6,
-    whitespace = 7,
-    character = 8,
+    utf8_codepoint = 7,
+    unsigned_long = 8,
+    value_range_start = 9,
+    value_range_stop = 10,
+    repetition_range_start = 11,
+    repetition_range_stop = 12,
+    range_separator = 13,
 } Token;
 
-#define TOKEN_COUNT 9
+typedef enum {
+    Default = 0,
+    InValueRange = 1,
+    InRepetitionRange = 2,
+} ParseMode;
+
+#define TOKEN_COUNT 14
+#define RANGE_SEPARATOR ','
 
 typedef struct {
     Token* tokens;
+    size_t number_of_tokens;
     char* regex;
     size_t open_blocks;
+    ParseMode parse_mode;
     bool escape_active;
     bool invalid;
 } ParserState;
@@ -39,8 +53,7 @@ void free_parser_state(ParserState* state);
 // Sollte man also den von mir gewählten Regex-Dialekt umändern wollen,
 // dann muss man einfach nur die Vergleiche in dieser Funktion umschreiben,
 // da alle anderen Funktionen nur mit den Enums arbeiten.
-// escape_active wird gebraucht, damit alles nach escape als character interpretiert wird.
-Token get_token_type(char token, bool escape_active);
+Token get_token_type(char character, ParseMode mode);
 char* get_token_description(Token token);
 // Versucht den Regex zu parsen und prüft, ob er syntaktisch richtig ist.
 ParserState* parse_regex(char* regex);
