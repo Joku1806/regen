@@ -74,11 +74,11 @@ Compact_Edge create_compact_edge(Edge *from) {
 
 void add_edge_between(Node *from, Node *to, char *matching) {
     if (from == NULL || to == NULL) {
-        warn("Mindestens einer der Knoten (%p und %p) existiert nicht. Deswegen können sie mit keiner Kante verbunden werden.\n", from, to);
+        warn("Can't add edge between %p and %p because at least one of them doesn't exist.\n", from, to);
         return;
     }
 
-    debug("Füge Kante zwischen z%u und z%u mit Match %s hinzu.\n", from->id, to->id, matching);
+    debug("Adding edge between states z%u and z%u matching %s.\n", from->id, to->id, matching);
     Edge *edge = (Edge *)VLA_reserve_next_slots(from->edges, 1);
     edge->matching = matching;
     edge->endpoint = to;

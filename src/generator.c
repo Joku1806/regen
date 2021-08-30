@@ -130,7 +130,7 @@ NFA *generate_nfa_from_parsed_regex(ParserState *parsed) {
             open_new_block_level(generator);
         } else if (current == block_close) {
             close_current_block_level(generator);
-        } else if (current == character) {
+        } else if (current == utf8_codepoint) {
             if (index + 1 < strlen(parsed->regex) && (parsed->tokens[index + 1] == mod_any || parsed->tokens[index + 1] == mod_multiple)) {
                 insert_proxy_start(generator);
             }
@@ -147,7 +147,8 @@ NFA *generate_nfa_from_parsed_regex(ParserState *parsed) {
         } else if (current == mod_optional) {
             loop_current_path_forward(generator, 2);
         } else {
-            warn("Habe unerwartetes Token %s gefunden, hätte während dem Parsing entfernt werden sollen.\n", get_token_description(current));
+            // TODO: Unterstützung von Repetition/ValueRange
+            warn("NFA generation for tokens of type %s is not handled yet.\n", get_token_description(current));
         }
     }
 
@@ -169,7 +170,7 @@ Compact_NFA *compact_generated_NFA(NFA *nfa) {
     while (VLA_get_length(visitor_order) > 0) {
         VLA_print(visitor_order, node_pointer_formatter);
         Node *visiting = *(Node **)stack_pop(visitor_order);
-        debug("Knoten gespeichert bei %p mit id=%lu und %lu ausgehenden Kanten.\n", visiting, visiting->id, VLA_get_length(visiting->edges));
+        debug("NFA state at %p with id=%lu and %lu outgoing edges.\n", visiting, visiting->id, VLA_get_length(visiting->edges));
         compact_nfa->nodes[visiting->id] = create_compact_node(visiting);
 
         for (size_t index = 0; index < compact_nfa->nodes[visiting->id].edge_count; index++) {

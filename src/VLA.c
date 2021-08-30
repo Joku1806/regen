@@ -5,33 +5,41 @@
 
 // Initialisiert einen VLA mit capacity vielen Bytes reserviert.
 VLA* VLA_initialize(size_t capacity, size_t item_size) {
+    if (item_size == 0) {
+        warn("Item size of 0 is not allowed, since those items can't exist.\n");
+        return NULL;
+    }
+
     if (capacity == 0) {
-        warn("Wegen der Alloziierungsstrategie dieser VLA-Implementierung muss die initiale Kapazität >0 sein. Benutze stattdessen den Standardwert 1.\n");
+        warn("The resizing strategy of this VLA needs the initial capacity to be non-zero. Bumping to default value of 1.\n");
         capacity = 1;
     }
 
     VLA* v = calloc(1, sizeof(VLA));
     if (v == NULL) {
-        panic("Konnte keinen Speicher reservieren!\n");
+        panic("Could not initialize VLA using calloc(1, %lu), aborting.\n", sizeof(VLA));
     }
 
     v->capacity = capacity * item_size;
     v->length = 0;
     v->item_size = item_size;
     v->data = calloc(capacity, item_size);
+    if (v->data == NULL) {
+        panic("Could not allocate data region of the VLA using calloc(%lu, %lu), aborting.\n", capacity, item_size);
+    }
 
     return v;
 }
 
 void VLA_assert_in_bounds(VLA* v, size_t index) {
-    if (index * v->item_size >= v->length) {
-        panic("Index %ld liegt außerhalb des reservierten Speichers für diesen VLA mit Länge=%ld.\n", index, v->length / v->item_size);
+    if (index * v->item_size >= v->capacity) {
+        panic("Index %ld is out of bounds for this VLA with capacity=%ld.\n", index, v->capacity / v->item_size);
     }
 }
 
 void VLA_assert_item_size_matches(VLA* v, size_t item_size) {
     if (item_size != v->item_size) {
-        panic("Zu prüfende Itemgröße %ld passt nicht zu diesem VLA mit Itemgröße=%ld.\n", item_size, v->item_size);
+        panic("Provided item size %ld doesn't match this VLA (item size=%ld).\n", item_size, v->item_size);
     }
 }
 
@@ -44,7 +52,7 @@ void VLA_resize(VLA* v, size_t size) {
     v->capacity = size;
     v->data = realloc(v->data, size);
     if (v->data == NULL) {
-        panic("Konnte keinen Speicher reservieren!\n");
+        panic("Couldn't reallocate data region, aborting.\n");
     }
 }
 
@@ -127,16 +135,16 @@ void VLA_print_setup_information_header(VLA* v, VLA* formatter) {
     const int n = snprintf(NULL, 0, "%zu", SIZE_MAX);
     char buffer[n + 1];
 
-    VLA_batch_append(formatter, "VLA mit Itemgröße: ", 21);
+    VLA_batch_append(formatter, "VLA with item size: ", 20);
     chars_written = snprintf(buffer, n + 1, "%zu", v->item_size);
     VLA_batch_append(formatter, buffer, chars_written);
-    VLA_batch_append(formatter, " Bytes -- Benutzter Platz: ", 27);
+    VLA_batch_append(formatter, " bytes -- used space: ", 22);
     chars_written = snprintf(buffer, n + 1, "%zu", v->length);
     VLA_batch_append(formatter, buffer, chars_written);
     VLA_batch_append(formatter, "/", 1);
     chars_written = snprintf(buffer, n + 1, "%zu", v->capacity);
     VLA_batch_append(formatter, buffer, chars_written);
-    VLA_batch_append(formatter, " Bytes", 6);
+    VLA_batch_append(formatter, " bytes", 6);
 }
 
 void VLA_print_dump_data(VLA* v, VLA* output, void (*item_formatter)(VLA* formatter, void* item)) {
@@ -150,7 +158,7 @@ void VLA_print_dump_data(VLA* v, VLA* output, void (*item_formatter)(VLA* format
 void VLA_print(VLA* v, void (*item_formatter)(VLA* output, void* item)) {
 #ifdef DEBUG
     if (item_formatter == NULL) {
-        warn("Bitte gebe einen Formatierer an, damit die gespeicherten Daten ausgegeben werden können.\n");
+        warn("To print items, please specify a formatter that can interpret them.\n");
         return;
     }
 

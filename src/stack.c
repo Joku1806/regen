@@ -6,7 +6,7 @@ void stack_push(Stack* s, void* address) { VLA_append(s, address); }
 
 void stack_pop_n(Stack* s, size_t amount) {
     if (VLA_get_length(s) < amount) {
-        warn("Kann nicht mehr Items löschen als im Stack gespeichert sind!\n");
+        warn("Cannot delete %lu items because there are only %lu currently saved in the stack.\n", amount, VLA_get_length(s));
         amount = VLA_get_length(s);
     }
 
