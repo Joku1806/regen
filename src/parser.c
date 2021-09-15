@@ -303,5 +303,6 @@ ParserState *parse_regex(char *input) {
     state->regex = (char *)VLA_extract(regex);
     state->number_of_tokens = VLA_get_length(tokens);
     state->tokens = (Token *)VLA_extract(tokens);
+    free(cleaned_input);
     return state;
 }
