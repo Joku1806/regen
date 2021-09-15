@@ -1,5 +1,6 @@
-#include <stdbool.h>
 #include <string.h>
+#include "parser.h"
+#include "generator.h"
 #include "matcher.h"
 #include "stack.h"
 #include "debug.h"
@@ -62,21 +63,32 @@ PartialMatch* take_matching_edge(PartialMatch* current_match, Compact_Edge* edge
     return advanced;
 }
 
-Match* match(char* to_match, Compact_NFA* match_with, size_t* matches_count) {
+Match* match(char* to_match, char* regex, size_t* matches_count) {
+    ParserState* state = parse_regex(regex);
+    if (state->invalid) {
+        printf("%s is not a syntactically correct regex.\n", regex);
+        return 0;
+    }
+
+    NFA* nfa = generate_nfa_from_parsed_regex(state);
+    // FIXME: Bin mir nicht sicher, ob der kompakte VLA wirklich einen großen Unterschied in der Geschwindigkeit ausmacht.
+    // Und selbst falls es schneller ist, ob es den Aufwand ausgleicht, alles doppelt implementieren zu müssen.
+    Compact_NFA* compacted = compact_generated_NFA(nfa);
+
     Stack* partial_matches = stack_initialize(5, sizeof(PartialMatch*));
     VLA* matches = VLA_initialize(5, sizeof(Match));
-    VLA** cycle_guards = setup_cycle_guards(match_with);
+    VLA** cycle_guards = setup_cycle_guards(compacted);
 
     for (size_t offset = 0; offset < strlen(to_match); offset++) {
         PartialMatch* start = calloc(1, sizeof(PartialMatch));
         start->length = 0;
-        start->node_index = match_with->start_node_index;
+        start->node_index = compacted->start_node_index;
         stack_push(partial_matches, &start);
 
         while (VLA_get_length(partial_matches) > 0) {
             PartialMatch* current_match = *(PartialMatch**)stack_pop(partial_matches);
 
-            if (current_match->node_index == match_with->stop_node_index) {
+            if (current_match->node_index == compacted->stop_node_index) {
                 Match* match = (Match*)VLA_reserve_next_slots(matches, 1);
                 match->offset = offset;
                 match->length = current_match->length;
@@ -85,8 +97,8 @@ Match* match(char* to_match, Compact_NFA* match_with, size_t* matches_count) {
             if (offset + current_match->length > strlen(to_match)) continue;
             char* matching_position = to_match + offset + current_match->length;
 
-            for (size_t edge_index = 0; edge_index < match_with->nodes[current_match->node_index].edge_count; edge_index++) {
-                Compact_Edge* current_edge = &match_with->nodes[current_match->node_index].edges[edge_index];
+            for (size_t edge_index = 0; edge_index < compacted->nodes[current_match->node_index].edge_count; edge_index++) {
+                Compact_Edge* current_edge = &compacted->nodes[current_match->node_index].edges[edge_index];
                 if (matches_edge(matching_position, current_edge)) {
                     VLA* responsible_guard = cycle_guards[current_edge->endpoint];
                     if (would_enter_infinite_loop(responsible_guard, current_match, current_edge)) continue;
@@ -98,16 +110,16 @@ Match* match(char* to_match, Compact_NFA* match_with, size_t* matches_count) {
             free(current_match);
         }
 
-        clear_cycle_guards(cycle_guards, match_with->node_count);
+        clear_cycle_guards(cycle_guards, compacted->node_count);
     }
 
     VLA_free(partial_matches);
-    for (size_t delete_index = 0; delete_index < match_with->node_count; delete_index++) {
+    for (size_t delete_index = 0; delete_index < compacted->node_count; delete_index++) {
         if (cycle_guards[delete_index] == NULL) continue;
         VLA_free(cycle_guards[delete_index]);
     }
     free(cycle_guards);
-    free_compact_nfa(match_with);
+    free_compact_nfa(compacted);
 
     *matches_count = VLA_get_length(matches);
     return (Match*)VLA_extract(matches);
