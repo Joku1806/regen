@@ -26,7 +26,31 @@ To match whitespace, either escape it or use reserved keywords such as \n or \t.
 
 ## Usage
 
-Right now, to use regen in your own code, you would have to include Parser, Generator and Matcher seperately and compile your regex in multiple stages. For a reference, see main.c
+```c
+#include <stdio.h>
+#include "matcher.h"
+
+int main(int argc, char** argv) {
+    char* regex = "(c|h)+at!?";
+    char* text = "Having a chat with a cat wearing a hat!";
+
+    size_t matches_count = 0;
+    Match* matches = match(text, regex, &matches_count);
+
+    for (size_t idx = 0; idx < matches_count; idx++) {
+        Match m = matches[idx];
+        printf("Found \"%.*s\"\n", (int)m.length, text + m.offset);
+    }
+
+    free(matches);
+    return 0;
+}
+```
+As you can see, using regen is very simple:<br>
+Just include `matcher.h` and call `match()` with your text and regex. Additionally you have to supply a `size_t*` as the third argument, which will contain the number of matches after the function ends. This way you can to iterate over the returned matches.
+
+The return value of `match()` is an array of structs containing offset and length, but no additional information about the text itself.<br>
+So don't touch the text until you have done everything you want with the matches!
 
 ## Installation
 
