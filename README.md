@@ -54,4 +54,4 @@ So don't touch the text until you have done everything you want with the matches
 
 ## Installation
 
-To install, just clone this repository and run `make lib` in the root of the repository. To produce a standalone binary, there is also `make debug` and `make release`.
+To install, just clone this repository and run `make release` in the root of the repository. To get debug symbols and runtime memory leak/access tripwires, run `make debug` instead.
