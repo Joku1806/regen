@@ -24,15 +24,24 @@ Symbol | Name | Example
 Any whitespace in the regex is ignored.<br>
 To match whitespace, either escape it or use reserved keywords such as \n or \t.
 
+## Installation
+
+To install, clone this repository and run `make lib` in the root of the project. 
+It will generate `lib/libregen.so` that you can copy to whereever you need it.
+
 ## Usage
 
+To use regen you will need to link against `libregen.so` and also copy `src/matcher.h` to your own project.
+After that you can use it like this:
+
 ```c
+#include <stdlib.h>
 #include <stdio.h>
-#include "matcher.h"
+#include "path/to/matcher.h"
 
 int main(int argc, char** argv) {
-    char* regex = "(c|h)+at!?";
     char* text = "Having a chat with a cat wearing a hat!";
+    char* regex = "(c|h)+at!?";
 
     size_t matches_count = 0;
     Match* matches = match(text, regex, &matches_count);
@@ -46,12 +55,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 ```
-As you can see, using regen is very simple:<br>
-Just include `matcher.h` and call `match()` with your text and regex. Additionally you have to supply a `size_t*` as the third argument, which will contain the number of matches after the function ends. This way you can to iterate over the returned matches.
+When calling `match` you need to pass your text and regex as well as a `size_t*` which will contain the number of matches after the function ends. This way you can to iterate over the returned matches.
 
-The return value of `match()` is an array of structs containing offset and length, but no additional information about the text itself.<br>
+The return value of `match` is an array of structs containing offset and length, but no additional information about the text itself.<br>
 So don't touch the text until you have done everything you want with the matches!
-
-## Installation
-
-To install, just clone this repository and run `make release` in the root of the repository. To get additional debug output, symbols and runtime memory leak/access tripwires, run `make debug` instead.
