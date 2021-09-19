@@ -45,7 +45,6 @@ struct Compact_Edge {
 };
 
 Node *create_node(size_t *id);
-void free_node(Node *to_free);
 void add_edge_between(Node *from, Node *to, char *matching);
 void add_empty_edge_between(Node *from, Node *to);
 Compact_Node create_compact_node(Node *from);
@@ -55,10 +54,8 @@ void free_nfa(NFA *NFA, Node **nodes);
 Compact_NFA *initialize_compact_nfa(size_t node_count);
 void free_compact_nfa(Compact_NFA *compact_nfa);
 
-Node *VLA_binding_get_node(VLA *v, signed long index);
 Node *VLA_binding_get_node_pointer(VLA *v, signed long index);
 Edge *VLA_binding_get_edge(VLA *v, signed long index);
-void node_formatter(VLA *output, void *item);
 void node_pointer_formatter(VLA *output, void *item);
 
 #endif

@@ -88,13 +88,6 @@ void VLA_batch_append(VLA* v, void* address, size_t amount) {
     memcpy(VLA_reserve_next_slots(v, amount), address, amount * v->item_size);
 }
 
-void VLA_replace_at_index(VLA* v, void* address, signed long index) {
-    index = VLA_normalize_index(v, index);
-    VLA_assert_in_bounds(v, index);
-
-    memcpy(v->data + index * v->item_size, address, v->item_size);
-}
-
 // Löscht das index'te Item, indem das letzte Item dorthin kopiert und die Länge um v->item_size verringert wird.
 // Diese Methode erhält nicht die Reihenfolge der Items.
 void VLA_delete_at_index(VLA* v, signed long index) {
@@ -120,14 +113,6 @@ uint8_t* VLA_get(VLA* v, signed long index) {
 size_t VLA_get_length(VLA* v) {
     if (v == NULL) return 0;
     return v->length / v->item_size;
-}
-
-void VLA_address_formatter(VLA* output, void* item) {
-    unsigned long address = *(unsigned long*)item;
-    const int n = snprintf(NULL, 0, "%p", (void*)address);
-    char buffer[n + 1];
-    snprintf(buffer, n + 1, "%p", (void*)address);
-    VLA_batch_append(output, &buffer, n);
 }
 
 void VLA_print_setup_information_header(VLA* v, VLA* formatter) {

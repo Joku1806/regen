@@ -5,6 +5,13 @@
 #include "debug.h"
 #include "parser.h"
 
+ParserState *initialize_parser_state();
+// Definiert ein Mapping von Buchstaben auf die einzelnen Token-Typen.
+// Sollte man also den von mir gewählten Regex-Dialekt umändern wollen,
+// dann muss man einfach nur die Vergleiche in dieser Funktion umschreiben,
+// da alle anderen Funktionen nur mit den Enums arbeiten.
+Token get_token_type(char character, ParseMode mode);
+
 bool grammar_blocklist[TOKEN_COUNT][TOKEN_COUNT] = {
     [block_open][block_close] = true,
     [block_open][mod_optional] = true,

@@ -3,6 +3,8 @@
 #include "NFA.h"
 #include "debug.h"
 
+void free_node(Node *to_free);
+
 Node *create_node(size_t *id) {
     Node *new = malloc(sizeof(Node));
     new->edges = VLA_initialize(1, sizeof(Edge));
@@ -89,11 +91,6 @@ void add_empty_edge_between(Node *from, Node *to) {
     add_edge_between(from, to, empty);
 }
 
-Node *VLA_binding_get_node(VLA *v, signed long index) {
-    VLA_assert_item_size_matches(v, sizeof(Node));
-    return (Node *)VLA_get(v, index);
-}
-
 Node *VLA_binding_get_node_pointer(VLA *v, signed long index) {
     VLA_assert_item_size_matches(v, sizeof(Node *));
     return *(Node **)VLA_get(v, index);
@@ -102,17 +99,6 @@ Node *VLA_binding_get_node_pointer(VLA *v, signed long index) {
 Edge *VLA_binding_get_edge(VLA *v, signed long index) {
     VLA_assert_item_size_matches(v, sizeof(Edge));
     return (Edge *)VLA_get(v, index);
-}
-
-void node_formatter(VLA *output, void *item) {
-    Node *casted = (Node *)item;
-    VLA_append(output, "z");
-
-    const int n = snprintf(NULL, 0, "%zu", casted->id);
-    char buffer[n + 1];
-    snprintf(buffer, n + 1, "%zu", casted->id);
-
-    VLA_batch_append(output, &buffer, n);
 }
 
 void node_pointer_formatter(VLA *output, void *item) {
