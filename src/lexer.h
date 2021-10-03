@@ -57,7 +57,7 @@ private:
   // are allowed after one another. For example,
   // [TokenKind::Alternator][TokenKind::Literal] = true means that an Alternator
   // can be followed by a Literal. Everything that is not set in this 2D array
-  // is not syntactically correct. These rules don't include the Concetenator
+  // is not syntactically correct. These rules don't include the Concatenator
   // operator as well as any whitespace for the following reasons:
   //
   // 1. Concatenator: This is only helpful for the AST generation and can't be
@@ -153,11 +153,16 @@ private:
   LexMode m_mode;
   std::string m_regex;
   std::vector<Token> m_tokens;
-  // Tries to convert unicode characters such as \u03BB to their actual byte
+  uint8_t
+  determine_utf8_character_size(const std::vector<uint8_t> &source_bytes);
+  uint8_t get_uint8_slice_from_bitstream(const std::vector<uint8_t> &bytes,
+                                         uint32_t start, uint32_t stop);
+  // FIXME: description is not accurate right now
+  // Tries to convert unicode characters such as \u03BB to their actual utf-8
   // representation. Returns {} if symbol doesn't start with \u or the
-  // string following \u is not a valid encoded unicode character.
+  // string following \u is not a valid encoded utf-8 character.
   std::optional<std::string>
-  convert_utf8_character(const std::string &utf8_repr);
+  convert_escaped_utf8_character(const std::string &utf8_repr);
   // Tries to convert commonly encoded characters such as \n, \t, etc...
   // to their actual ASCII value. Returns {} if symbol is not one of those
   // characters. This method makes it possible to distinguish these kinds of
