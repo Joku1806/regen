@@ -249,8 +249,20 @@ std::vector<Token *> Lexer::lex() {
       m_currently_open_subgroups--;
     } else if (m_current == RepetitionRangeOpen) {
       m_mode = InRepetitionRange;
+    } else if (m_current == RepetitionRangeClose) {
+      // TODO: Should probably be handled by identify_current_token_kind(), so
+      // that the close symbol in the default context is just evaluated as a
+      // character
+      std::cerr << "Trying to close a non-existent repetition range is not "
+                   "allowed!\n";
+      throw;
     } else if (m_current == LiteralRangeOpen) {
       m_mode = InLiteralRange;
+    } else if (m_current == LiteralRangeClose) {
+      // TODO: same here as with RepetitionRangeClose
+      std::cerr << "Trying to close a non-existent literal range is not "
+                   "allowed!\n";
+      throw;
     }
 
     m_tokens.push_back(new Token(m_current));
