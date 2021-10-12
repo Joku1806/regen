@@ -1,5 +1,6 @@
 #include "../src/Lexer.h"
 #include <criterion/criterion.h>
+#include <signal.h>
 #include <vector>
 
 void check_lexer_output_equals(std::vector<Token *> generated,
@@ -59,4 +60,36 @@ Test(repetition_range, single_value) {
           new LiteralToken("e"), new Token(RepetitionRangeOpen),
           new NumberToken(69), new Token(RangeArgumentSeparator),
           new NumberToken(69), new Token(RepetitionRangeClose)});
+}
+
+// Just aborting as a catch-all is pretty bad error handling,
+// should be changed to something more sensible
+Test(repetition_range, multiple_numbers_in_argument_should_fail,
+     .signal = SIGABRT) {
+  Lexer("f{0xfeed 0xbeef, 567}").lex();
+}
+
+Test(repetition_range, invalid_number_in_argument_should_fail,
+     .signal = SIGABRT) {
+  Lexer("f{567, 0xgg}").lex();
+}
+
+Test(repetition_range, literal_in_argument_should_fail, .signal = SIGABRT) {
+  Lexer("g{NaN111, 33}").lex();
+}
+
+Test(repetition_range, unclosed_range_should_fail, .signal = SIGABRT) {
+  Lexer("f{13,14").lex();
+}
+
+Test(repetition_range, empty_range_should_fail, .signal = SIGABRT) {
+  Lexer("g{}").lex();
+}
+
+Test(repetition_range, unstarted_range_should_fail, .signal = SIGABRT) {
+  Lexer("h,15}").lex();
+}
+
+Test(repetition_range, no_body_before_range_should_fail, .signal = SIGABRT) {
+  Lexer("{156, 165}").lex();
 }
